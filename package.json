@@ -5,7 +5,8 @@
   "scripts": {
     "test": "node --test",
     "check": "node --check src/finance.js && node --check src/server.js && node --check web/app.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "seed:demo": "node scripts/seed-demo.js"
   },
   "engines": { "node": ">=22" }
 }

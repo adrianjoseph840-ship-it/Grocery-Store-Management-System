@@ -9,33 +9,45 @@ paper-debt migration, settlement tracking, verification, and financial reporting
 - [PostgreSQL schema](docs/schema.sql)
 - [Implementation roadmap](docs/implementation-roadmap.md)
 
-## Recommended stack
+## Stack
 
-- **Frontend:** Next.js (React + TypeScript), Tailwind CSS, TanStack Query
-- **Backend:** NestJS (TypeScript), REST API, OpenAPI/Swagger
-- **Database:** PostgreSQL with Prisma or Drizzle ORM
-- **Authentication:** Secure server sessions or short-lived access tokens with
-  rotating refresh tokens
-- **Deployment:** Docker Compose initially; managed PostgreSQL and container hosting
-  for production
-
-Start as a modular monolith. It is easier to deploy and keep financial operations
-transactional than microservices, while module boundaries leave room to split out
-reporting or notifications later.
+Node.js (no external packages), SQLite, HTML, CSS, and JavaScript. The app runs on
+one local machine. The PostgreSQL documentation describes a future larger deployment.
 
 ## Run locally
 
-Requires Node.js 22 or newer. In PowerShell:
+Requires Node.js 22 or newer. Open PowerShell in this project folder. To check Node:
 
 ```powershell
-$env:CANTEEN_ADMIN_PASSWORD = "choose-a-strong-unique-password"
+node --version
+```
+
+On the first run with a new database, set an administrator password and start the app:
+
+```powershell
+$env:CANTEEN_ADMIN_PASSWORD = "replace-with-your-own-long-password"
 node src/server.js
 ```
 
-Open `http://127.0.0.1:3000`, then sign in as `admin` with that password. The password
-is only used when the database is first created. Data lives in `data/canteen.sqlite`
-and is excluded from Git. Set `CANTEEN_DATA_DIR` to choose another data folder and
-`PORT` to change the listening port. Run tests with `node --test`.
+Open `http://127.0.0.1:3000` and log in as `admin` with that password. Keep PowerShell
+open while using the app; press `Ctrl+C` to stop it. The password variable is used only
+when creating a new database. On later runs, simply use `node src/server.js`.
+
+To create optional sample accounts and menu items after the database exists:
+
+```powershell
+$env:CANTEEN_DEMO_PASSWORD = "choose-a-demo-password-12-chars-or-more"
+node scripts/seed-demo.js
+```
+
+This creates `demo.admin`, `demo.cashier`, `demo.guard`, and `demo.buyer` with that
+password. It does not change existing accounts. Do not use demo accounts for real
+financial records. Administrators can create actual accounts in the **Team** tab;
+there is no public registration page.
+
+Data lives in `data/canteen.sqlite` and is excluded from Git. Set `CANTEEN_DATA_DIR`
+to choose another data folder and `PORT` to change the listening port. Run tests with
+`node --test`.
 
 ## Implemented workflows
 

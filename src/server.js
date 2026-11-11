@@ -45,11 +45,11 @@ bootstrap();
 
 function authentication(req) {
   const cookie = req.headers.cookie?.split(';').map(s => s.trim()).find(s => s.startsWith('canteen_session='))?.split('=')[1];
-  if (!cookie) throw appError('Sign in required', 401);
+  if (!cookie) throw appError('Log in required', 401);
   const tokenHash = scryptSync(cookie, 'canteen-session', 32).toString('hex');
   const session = db.prepare('SELECT user_id FROM sessions WHERE token_hash=? AND expires_at>?').get(tokenHash, Date.now());
   const user = session && findUser(session.user_id);
-  if (!user?.active) throw appError('Sign in required', 401);
+  if (!user?.active) throw appError('Log in required', 401);
   return user;
 }
 function json(res, status, value, headers = {}) { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...headers }); res.end(JSON.stringify(value)); }
@@ -129,5 +129,5 @@ async function api(req, res, path) {
 }
 
 const webRoot = join(process.cwd(), 'web');
-const server = http.createServer(async (req, res) => { try { const url = new URL(req.url, 'http://localhost'); if (req.method !== 'GET' && req.headers.origin && new URL(req.headers.origin).host !== req.headers.host) throw appError('Invalid origin', 403); if (url.pathname.startsWith('/api/')) return await api(req, res, url.pathname); if (req.method !== 'GET') throw appError('Method not allowed', 405); const file = url.pathname === '/' ? 'index.html' : url.pathname.slice(1); if (!['index.html', 'app.js', 'style.css'].includes(file)) throw appError('Not found', 404); const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' }; res.writeHead(200, { 'content-type': mime[extname(file)], 'x-content-type-options': 'nosniff' }); res.end(readFileSync(join(webRoot, file))); } catch (error) { const status = Number.isInteger(error.code) ? error.code : 500; json(res, status, { error: status === 500 ? 'Internal server error' : error.message }); if (status === 500) console.error(error); } });
+const server = http.createServer(async (req, res) => { try { const url = new URL(req.url, 'http://localhost'); if (req.method !== 'GET' && req.headers.origin && new URL(req.headers.origin).host !== req.headers.host) throw appError('Invalid origin', 403); if (url.pathname.startsWith('/api/')) return await api(req, res, url.pathname); if (req.method !== 'GET') throw appError('Method not allowed', 405); const file = url.pathname === '/' ? 'index.html' : url.pathname.slice(1); if (!['index.html', 'app.js', 'style.css', 'theme.css'].includes(file)) throw appError('Not found', 404); const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' }; res.writeHead(200, { 'content-type': mime[extname(file)], 'x-content-type-options': 'nosniff' }); res.end(readFileSync(join(webRoot, file))); } catch (error) { const status = Number.isInteger(error.code) ? error.code : 500; json(res, status, { error: status === 500 ? 'Internal server error' : error.message }); if (status === 500) console.error(error); } });
 server.listen(Number(process.env.PORT || 3000), '127.0.0.1', () => console.log(`Canteen running at http://127.0.0.1:${process.env.PORT || 3000}`));

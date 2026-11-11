@@ -32,6 +32,9 @@ test('cashier sale and settlement reconcile in persistent API', async () => {
     const page = await fetch(`http://127.0.0.1:${port}/`);
     assert.equal(page.status, 200);
     assert.match(await page.text(), /aria-label="Main navigation"/);
+    const theme = await fetch(`http://127.0.0.1:${port}/theme.css`);
+    assert.equal(theme.status, 200);
+    assert.match(await theme.text(), /login-story/);
     const styles = await fetch(`http://127.0.0.1:${port}/style.css`);
     assert.equal(styles.status, 200);
     assert.match(await styles.text(), /pos-grid/);
