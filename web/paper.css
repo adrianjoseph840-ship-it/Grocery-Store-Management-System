@@ -1,4 +1,76 @@
 /* Paper-slip dashboard: field charts, recent slips, and collection forms. */
+.sheet-table {
+  width: 100%;
+  min-width: 760px;
+}
+.sheet-table th {
+  background: #e9f1e9;
+  color: #264b37;
+  position: sticky;
+  top: 0;
+}
+.sheet-table td {
+  padding: 5px;
+  border: 1px solid #e5ece5;
+}
+.sheet-table .row-number {
+  width: 42px;
+  text-align: center;
+  color: #7d8b80;
+  background: #f8faf7;
+}
+.sheet-table input,
+.sheet-table select {
+  margin: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 4px;
+  min-width: 130px;
+}
+.sheet-table input:hover,
+.sheet-table select:hover,
+.sheet-table input:focus,
+.sheet-table select:focus {
+  border-color: #a2c9ac;
+  background: white;
+}
+.sheet-table .sheet-name {
+  min-width: 185px;
+}
+.sheet-table .sheet-amount {
+  min-width: 125px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.sheet-table .sheet-date {
+  min-width: 160px;
+}
+.sheet-table .sheet-remove {
+  padding: 4px 8px;
+  min-height: 32px;
+  min-width: 32px;
+}
+.sheet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid #dce7dc;
+  padding-top: 16px;
+  margin-top: 16px;
+}
+.sheet-total {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-left: auto;
+  color: #5b7062;
+}
+.sheet-total strong {
+  font-size: 1.45rem;
+  color: #175d42;
+  font-variant-numeric: tabular-nums;
+}
 .paper-kpis {
   margin-bottom: 18px;
 }

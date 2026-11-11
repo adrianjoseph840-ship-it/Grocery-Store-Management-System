@@ -213,6 +213,15 @@ async function api(req, res, path) {
         paper.addSlip(await body(req), user.id, req.headers["idempotency-key"]),
       );
     }
+    if (method === "POST" && path === "/api/paper/slips/batch") {
+      roles(user, "ADMIN", "CASHIER");
+      const input = await body(req);
+      return json(
+        res,
+        201,
+        paper.addSlips(input.slips, user.id, req.headers["idempotency-key"]),
+      );
+    }
     if (method === "POST" && path === "/api/paper/collections") {
       roles(user, "ADMIN", "CASHIER");
       return json(
@@ -891,6 +900,7 @@ const server = http.createServer(async (req, res) => {
         "app.js",
         "api.js",
         "paper-ui.js",
+        "slip-sheet.js",
         "style.css",
         "theme.css",
         "paper.css",

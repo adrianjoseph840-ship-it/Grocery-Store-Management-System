@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
-    "check": "node --check src/finance.js && node --check src/paper.js && node --check src/server.js && node --check web/api.js && node --check web/app.js && node --check web/paper-ui.js && node --check scripts/seed-demo.js",
+    "check": "node --check src/finance.js && node --check src/paper.js && node --check src/server.js && node --check web/api.js && node --check web/app.js && node --check web/paper-ui.js && node --check web/slip-sheet.js && node --check scripts/seed-demo.js",
     "start": "node src/server.js",
     "seed:demo": "node scripts/seed-demo.js",
     "format": "prettier --write src web test scripts package.json",

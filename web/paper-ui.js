@@ -1,4 +1,5 @@
 import { request } from "./api.js";
+import { sheetPage } from "./slip-sheet.js";
 
 /** Screens for the paper-slip workflow. The API remains the source of all totals. */
 const $ = (selector) => document.querySelector(selector);
@@ -41,7 +42,7 @@ export async function renderPaperPage(tab, view, notice, role) {
     }
   };
   if (tab === "Dashboard") return dashboard(view);
-  if (tab === "Paper slips") return slipsPage(view, notice, run);
+  if (tab === "Paper slips") return sheetPage(view, notice, run);
   if (tab === "People & fields") return peoplePage(view, notice, run, role);
   if (tab === "Collections") return collectionsPage(view, notice, run);
   if (tab === "Weekly report") return reportPage(view, notice, run);
@@ -53,10 +54,10 @@ async function dashboard(view) {
     request(`/paper/report?from=${weekStart(today())}&to=${today()}`),
   ]);
   const max = Math.max(...all.fields.map((f) => f.salesMinor), 1);
-  view.innerHTML = `<div class="page-head"><div><div class="eyebrow">PAPER SLIP LEDGER</div><h1>Canteen dashboard</h1><p>Sales recorded, money collected, and unpaid slips across all fields.</p></div><span class="pill">Updated now</span></div>
-    <div class="grid paper-kpis">${metric("Total sales", all.salesMinor, "All recorded slips")}${metric("Money collected", all.collectedMinor, "Cash and payroll received")}${metric("Outstanding", all.outstandingMinor, "Still to be deducted or paid")}${metric("This week", week.salesMinor, `${week.from} to ${week.to}`)}</div>
-    <div class="two"><div class="card"><h2>Sales by field</h2><p class="muted">Each person's paper slips stay in their field.</p>${all.fields.map((f) => `<div class="field-line"><div class="field-label"><strong>${esc(f.name)}</strong><span>${pesos(f.salesMinor)}</span></div><div class="field-track"><div style="width:${Math.round((f.salesMinor / max) * 100)}%"></div></div></div>`).join("")}</div>
-    <div class="card"><h2>Collection breakdown</h2><div class="summary-line"><span>Cash received</span><strong>${pesos(all.cashMinor)}</strong></div><div class="summary-line"><span>Payroll deductions received</span><strong>${pesos(all.payrollMinor)}</strong></div><div class="summary-line emphasis"><span>Still outstanding</span><strong>${pesos(all.outstandingMinor)}</strong></div><p class="muted">A slip counts as a sale when entered. It counts as collected only when paid in cash or deducted from payroll.</p></div></div>`;
+  view.innerHTML = `<div class="page-head"><div><div class="eyebrow">PAPER SLIP LEDGER</div><h1>Canteen dashboard</h1><p>Slip sales and collected income across all fields.</p></div><span class="pill">Updated now</span></div>
+    <div class="grid paper-kpis">${metric("Total sales", all.salesMinor, "All recorded slips")}${metric("Money collected", all.collectedMinor, "Cash and payroll received")}${metric("This week", week.salesMinor, `${week.from} to ${week.to}`)}</div>
+    <div class="two"><div class="card"><h2>Sales by field</h2><p class="muted">Every paper slip stays in its selected field, even without a name.</p>${all.fields.map((f) => `<div class="field-line"><div class="field-label"><strong>${esc(f.name)}</strong><span>${pesos(f.salesMinor)}</span></div><div class="field-track"><div style="width:${Math.round((f.salesMinor / max) * 100)}%"></div></div></div>`).join("")}</div>
+    <div class="card"><h2>Collection breakdown</h2><div class="summary-line"><span>Cash received</span><strong>${pesos(all.cashMinor)}</strong></div><div class="summary-line"><span>Payroll deductions received</span><strong>${pesos(all.payrollMinor)}</strong></div><p class="muted">A slip counts as a sale when entered. It counts as collected only when paid in cash or deducted from payroll.</p></div></div>`;
 }
 
 async function slipsPage(view, notice, run) {
@@ -110,7 +111,7 @@ async function peoplePage(view, notice, run, role) {
     request("/paper/fields"),
     request("/paper/people"),
   ]);
-  view.innerHTML = `<div class="page-head"><div><div class="eyebrow">ORGANIZATION</div><h1>People & fields</h1><p>Put each person in their field so every slip contributes to the right total.</p></div></div>
+  view.innerHTML = `<div class="page-head"><div><div class="eyebrow">ORGANIZATION</div><h1>People & fields</h1><p>People are optional for sheet entry. Register them here when you want a directory.</p></div></div>
     <div class="two"><div class="card"><h2>Add a person</h2><form id="addPaperPerson"><label>Full name<input name="name" required></label><label>Employee code (optional)<input name="employeeCode"></label><label>Field<select name="fieldId">${fieldOptions(fields.filter((f) => f.kind === "CREDIT"))}</select></label><button>Add person</button></form></div>${role === "ADMIN" ? '<div class="card"><h2>Add a field</h2><p class="muted">The default fields are ready. Add another for a new payroll group.</p><form id="addPaperField"><label>Field name<input name="name" placeholder="e.g. Maintenance" required></label><button class="secondary">Add field</button></form></div>' : ""}</div>
     <div class="card"><h2>Field directory</h2><div class="field-directory">${fields.map((f) => `<div class="field-directory-item"><div><strong>${esc(f.name)}</strong><div class="muted">${f.kind === "CASH" ? "Immediate cash sales" : `${people.filter((p) => p.field_id === f.id).length} people`}</div></div><span class="pill">${f.kind === "CASH" ? "Cash" : "Payroll"}</span></div>`).join("")}</div></div>`;
   $("#addPaperPerson").onsubmit = (event) => {
@@ -142,15 +143,15 @@ async function peoplePage(view, notice, run, role) {
 
 async function collectionsPage(view, notice, run) {
   const slips = (await request("/paper/slips")).filter(
-    (s) => s.person_id && s.amount_minor > s.collected_minor,
+    (s) => s.field_kind === "CREDIT" && s.amount_minor > s.collected_minor,
   );
-  view.innerHTML = `<div class="page-head"><div><div class="eyebrow">PAYROLL & PAYMENTS</div><h1>Collections</h1><p>Record each payroll deduction or partial cash payment against its original slip.</p></div></div><div class="card"><h2>Unpaid slips</h2>${slips.map((s) => `<div class="slip-row"><div><strong>${esc(s.person_name)}</strong><div class="muted">${esc(s.field_name)} · ${esc(s.slip_date)} · ${esc(s.reference || "No reference")}</div><div class="muted">Original ${pesos(s.amount_minor)} · Remaining ${pesos(s.amount_minor - s.collected_minor)}</div></div><button class="secondary" data-collect="${s.id}">Collect</button></div>`).join("") || '<div class="empty">No unpaid slips.</div>'}</div><div id="collectionEditor"></div>`;
+  view.innerHTML = `<div class="page-head"><div><div class="eyebrow">PAYROLL & PAYMENTS</div><h1>Collections</h1><p>Record each payroll deduction or partial cash payment against its original slip.</p></div></div><div class="card"><h2>Unpaid slips</h2>${slips.map((s) => `<div class="slip-row"><div><strong>${esc(s.display_name || "Unnamed slip")}</strong><div class="muted">${esc(s.field_name)} · ${esc(s.slip_date)} · ${esc(s.reference || "No reference")}</div><div class="muted">Original ${pesos(s.amount_minor)} · Remaining ${pesos(s.amount_minor - s.collected_minor)}</div></div><button class="secondary" data-collect="${s.id}">Collect</button></div>`).join("") || '<div class="empty">No unpaid slips.</div>'}</div><div id="collectionEditor"></div>`;
   view.querySelectorAll("[data-collect]").forEach(
     (button) =>
       (button.onclick = () => {
         const slip = slips.find((s) => s.id === button.dataset.collect);
         $("#collectionEditor").innerHTML =
-          `<div class="card"><h2>Collect from ${esc(slip.person_name)}</h2><p>Remaining on this slip: <strong>${pesos(slip.amount_minor - slip.collected_minor)}</strong></p><form id="collectForm"><label>Amount (₱)<input name="amount" type="number" min=".01" max="${((slip.amount_minor - slip.collected_minor) / 100).toFixed(2)}" step=".01" required></label><label>Method<select name="method"><option value="PAYROLL">Payroll deduction</option><option value="CASH">Cash payment</option></select></label><label>Collection date<input name="collectionDate" type="date" value="${today()}" required></label><label>Reference (optional)<input name="reference" placeholder="Payroll batch or receipt"></label><button>Record collection</button></form></div>`;
+          `<div class="card"><h2>Collect from ${esc(slip.display_name || "Unnamed slip")}</h2><p>Remaining on this slip: <strong>${pesos(slip.amount_minor - slip.collected_minor)}</strong></p><form id="collectForm"><label>Amount (₱)<input name="amount" type="number" min=".01" max="${((slip.amount_minor - slip.collected_minor) / 100).toFixed(2)}" step=".01" required></label><label>Method<select name="method"><option value="PAYROLL">Payroll deduction</option><option value="CASH">Cash payment</option></select></label><label>Collection date<input name="collectionDate" type="date" value="${today()}" required></label><label>Reference (optional)<input name="reference" placeholder="Payroll batch or receipt"></label><button>Record collection</button></form></div>`;
         $("#collectionEditor").scrollIntoView({
           behavior: "smooth",
           block: "start",

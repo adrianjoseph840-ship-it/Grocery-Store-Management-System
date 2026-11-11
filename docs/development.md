@@ -12,6 +12,7 @@
 | `web/api.js` | Browser HTTP client and response error handling |
 | `web/app.js` | Role screens and interaction handlers |
 | `web/paper-ui.js`, `web/paper.css` | Paper dashboard, entry screens, and styles |
+| `web/slip-sheet.js` | Spreadsheet rows, live total, and atomic batch submission |
 | `scripts/seed-demo.js` | Optional local demo users and menu data |
 
 The server listens on `127.0.0.1` by default. It serves browser files from `web/`
@@ -20,7 +21,8 @@ to the app root; `app.js` imports `api.js` and `paper-ui.js`. All paths are expl
 static file handler in `src/server.js`.
 
 The paper workflow uses `/api/paper/*` routes. Its tables are created additively on
-startup, preserving older POS records. The dashboard does not mix the two ledgers.
+startup, preserving older POS records. A startup migration adds the optional free-text
+name column to older paper-slip databases. The dashboard does not mix the two ledgers.
 
 ## Accounts
 

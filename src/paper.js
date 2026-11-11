@@ -15,7 +15,7 @@ export function createPaperService(db, { audit, transactional, appError }) {
       id TEXT PRIMARY KEY, person_id TEXT REFERENCES paper_people(id),
       field_id TEXT NOT NULL REFERENCES paper_fields(id), amount_minor INTEGER NOT NULL CHECK(amount_minor > 0),
       slip_date TEXT NOT NULL, reference TEXT, recorded_by TEXT NOT NULL REFERENCES users(id),
-      created_at TEXT NOT NULL, request_key TEXT NOT NULL UNIQUE
+      created_at TEXT NOT NULL, request_key TEXT NOT NULL UNIQUE, person_name TEXT
     );
     CREATE TABLE IF NOT EXISTS paper_collections (
       id TEXT PRIMARY KEY, slip_id TEXT NOT NULL REFERENCES paper_slips(id),
@@ -27,6 +27,14 @@ export function createPaperService(db, { audit, transactional, appError }) {
     CREATE INDEX IF NOT EXISTS paper_slips_person_idx ON paper_slips(person_id,slip_date);
     CREATE INDEX IF NOT EXISTS paper_collections_slip_idx ON paper_collections(slip_id);
   `);
+  // Existing local databases predate free-text names; add the column in place.
+  if (
+    !db
+      .prepare("PRAGMA table_info(paper_slips)")
+      .all()
+      .some((column) => column.name === "person_name")
+  )
+    db.exec("ALTER TABLE paper_slips ADD COLUMN person_name TEXT");
 
   // Default fields match the paper piles used at the counter. Custom fields are credit.
   for (const [name, kind] of [
@@ -137,7 +145,7 @@ export function createPaperService(db, { audit, transactional, appError }) {
   function listSlips() {
     return db
       .prepare(
-        `SELECT s.*,f.name field_name,p.name person_name,
+        `SELECT s.*,f.name field_name,f.kind field_kind,COALESCE(s.person_name,p.name) display_name,
       COALESCE((SELECT SUM(c.amount_minor) FROM paper_collections c WHERE c.slip_id=s.id),0) collected_minor
       FROM paper_slips s JOIN paper_fields f ON f.id=s.field_id
       LEFT JOIN paper_people p ON p.id=s.person_id
@@ -146,48 +154,74 @@ export function createPaperService(db, { audit, transactional, appError }) {
       .all();
   }
   function addSlip(input, actor, requestKey) {
+    return transactional(() => insertSlip(input, actor, requestKey));
+  }
+  function addSlips(inputs, actor, batchKey) {
+    if (!Array.isArray(inputs) || inputs.length < 1 || inputs.length > 100)
+      throw appError("Enter between 1 and 100 slips at a time");
+    if (
+      typeof batchKey !== "string" ||
+      batchKey.length < 8 ||
+      batchKey.length > 180
+    )
+      throw appError("Idempotency-Key header required");
+    // One database transaction makes the spreadsheet Save All operation atomic.
+    return transactional(() =>
+      inputs.map((input, index) =>
+        insertSlip(input, actor, `${batchKey}:${index}`),
+      ),
+    );
+  }
+  function insertSlip(input, actor, requestKey) {
     amount(input.amountMinor);
     date(input.slipDate);
     key(requestKey);
-    return transactional(() => {
-      const existing = db
-        .prepare("SELECT id FROM paper_slips WHERE request_key=?")
-        .get(requestKey);
-      if (existing) return { id: existing.id, duplicate: true };
-      const selected = field(input.fieldId);
-      let personId = null;
-      if (selected.kind === "CREDIT") {
-        const person = db
-          .prepare("SELECT * FROM paper_people WHERE id=?")
-          .get(input.personId);
-        if (!person || person.field_id !== selected.id)
-          throw appError("Choose a person in this field");
-        personId = person.id;
-      }
-      const id = randomUUID();
-      db.prepare("INSERT INTO paper_slips VALUES(?,?,?,?,?,?,?,?,?)").run(
-        id,
-        personId,
-        selected.id,
-        input.amountMinor,
-        input.slipDate,
-        input.reference?.trim() || null,
-        actor,
-        new Date().toISOString(),
-        requestKey,
-      );
-      audit(actor, "ADD_PAPER_SLIP", id, {
-        amountMinor: input.amountMinor,
-        fieldId: selected.id,
-        personId,
-      });
-      return {
-        id,
-        amountMinor: input.amountMinor,
-        fieldId: selected.id,
-        personId,
-      };
+    const existing = db
+      .prepare("SELECT id FROM paper_slips WHERE request_key=?")
+      .get(requestKey);
+    if (existing) return { id: existing.id, duplicate: true };
+    const selected = field(input.fieldId);
+    let personId = null;
+    let personName = typeof input.name === "string" ? input.name.trim() : "";
+    if (personName.length > 120)
+      throw appError("Name must be 120 characters or less");
+    if (input.personId) {
+      const person = db
+        .prepare("SELECT * FROM paper_people WHERE id=?")
+        .get(input.personId);
+      if (!person || person.field_id !== selected.id)
+        throw appError("Choose a person in this field");
+      personId = person.id;
+      if (!personName) personName = person.name;
+    }
+    const id = randomUUID();
+    db.prepare(
+      "INSERT INTO paper_slips(id,person_id,field_id,amount_minor,slip_date,reference,recorded_by,created_at,request_key,person_name) VALUES(?,?,?,?,?,?,?,?,?,?)",
+    ).run(
+      id,
+      personId,
+      selected.id,
+      input.amountMinor,
+      input.slipDate,
+      input.reference?.trim() || null,
+      actor,
+      new Date().toISOString(),
+      requestKey,
+      personName || null,
+    );
+    audit(actor, "ADD_PAPER_SLIP", id, {
+      amountMinor: input.amountMinor,
+      fieldId: selected.id,
+      personId,
+      personName: personName || null,
     });
+    return {
+      id,
+      amountMinor: input.amountMinor,
+      fieldId: selected.id,
+      personId,
+      personName: personName || null,
+    };
   }
   function addCollection(input, actor, requestKey) {
     amount(input.amountMinor);
@@ -301,6 +335,7 @@ export function createPaperService(db, { audit, transactional, appError }) {
     addPerson,
     listSlips,
     addSlip,
+    addSlips,
     addCollection,
     report,
   };

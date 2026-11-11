@@ -80,9 +80,11 @@ new password. A password reset logs that user out of existing sessions.
 - Buyer: own balance and ledger history.
 
 Default fields are **Guards, Admin, Operation, Extra, Agency, Driver, and Cash**.
-Paper slips are linked to a person in a field; Cash slips need no person and count
-as collected immediately. The **Weekly report** accepts any date range, including
-only part of a week.
+**Paper slips** is a spreadsheet-style entry sheet: add rows with field, optional
+name, amount, and date. The total updates as you type, and **Save all slips** posts
+the whole batch together. Cash slips count as collected immediately. The dashboard
+shows sales and collected income without an outstanding-debt card. The **Weekly
+report** accepts any date range, including only part of a week.
 
 The earlier menu POS data and API remain in the database for continuity. The new
 paper-slip dashboard reports only the new paper ledger, so old sales are not counted

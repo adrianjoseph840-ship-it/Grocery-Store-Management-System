@@ -78,6 +78,9 @@ test("cashier sale and settlement reconcile in persistent API", async () => {
     const paperModule = await fetch(`http://127.0.0.1:${port}/paper-ui.js`);
     assert.equal(paperModule.status, 200);
     assert.match(await paperModule.text(), /renderPaperPage/);
+    const sheetModule = await fetch(`http://127.0.0.1:${port}/slip-sheet.js`);
+    assert.equal(sheetModule.status, 200);
+    assert.match(await sheetModule.text(), /sheetPage/);
     const theme = await fetch(`http://127.0.0.1:${port}/theme.css`);
     assert.equal(theme.status, 200);
     assert.match(await theme.text(), /login-story/);
@@ -176,6 +179,58 @@ test("cashier sale and settlement reconcile in persistent API", async () => {
     assert.deepEqual(
       [partWeek.salesMinor, partWeek.collectedMinor, partWeek.outstandingMinor],
       [0, 2000, 14000],
+    );
+    const batch = await call("/paper/slips/batch", "POST", {
+      slips: [
+        {
+          fieldId: guardField.id,
+          name: "",
+          amountMinor: 700,
+          slipDate: "2026-11-13",
+        },
+        {
+          fieldId: cashField.id,
+          name: "Visitor",
+          amountMinor: 300,
+          slipDate: "2026-11-13",
+        },
+      ],
+    });
+    assert.equal(batch.length, 2);
+    const savedSlips = await call("/paper/slips");
+    assert.ok(
+      savedSlips.some(
+        (s) =>
+          s.id === batch[0].id &&
+          s.display_name === null &&
+          s.field_kind === "CREDIT",
+      ),
+    );
+    assert.ok(
+      savedSlips.some(
+        (s) => s.id === batch[1].id && s.display_name === "Visitor",
+      ),
+    );
+    const sheetDay = await call("/paper/report?from=2026-11-13&to=2026-11-13");
+    assert.deepEqual(
+      [sheetDay.salesMinor, sheetDay.collectedMinor],
+      [1000, 300],
+    );
+    const badBatch = await call(
+      "/paper/slips/batch",
+      "POST",
+      {
+        slips: [
+          { fieldId: guardField.id, amountMinor: 100, slipDate: "2026-11-14" },
+          { fieldId: guardField.id, amountMinor: -1, slipDate: "2026-11-14" },
+        ],
+      },
+      400,
+    );
+    assert.match(badBatch.error, /Amount must be positive/);
+    assert.equal(
+      (await call("/paper/report?from=2026-11-14&to=2026-11-14")).salesMinor,
+      0,
     );
     const custom = await call("/paper/fields", "POST", { name: "Maintenance" });
     assert.equal(custom.name, "Maintenance");

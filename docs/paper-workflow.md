@@ -2,11 +2,12 @@
 
 ## Daily use
 
-1. In **People & fields**, add each worker to their field. The built-in fields are
-   Guards, Admin, Operation, Extra, Agency, Driver, and Cash. Admins can add more.
-2. In **Paper slips**, select the field and person, enter the written amount and date,
-   then record the slip. Use the Cash field for immediate cash purchases; it needs no
-   person.
+1. In **Paper slips**, enter one slip per spreadsheet row: field, optional name,
+   amount, and date. Add as many rows as needed and review the running total before
+   clicking **Save all slips**. The whole batch saves together.
+2. Use **People & fields** when you want a separate person directory or an additional
+   field. The built-in fields are Guards, Admin, Operation, Extra, Agency, Driver,
+   and Cash. Cash slips are collected immediately; names are optional in every field.
 3. When payroll actually deducts a slip, use **Collections** to enter the amount,
    date, and payroll reference. A cash payment toward a credit slip uses the Cash
    payment option. Multiple partial collections may be recorded, up to the slip total.
@@ -23,7 +24,10 @@ All amounts are stored in centavos, never floating point.
 - **Outstanding as of end date:** all credit slips dated on/before the end date minus
   their collections dated on/before that date.
 - **Field totals:** each slip keeps its field, so multiple guards accumulate under
-  Guards while remaining distinguishable by person.
+  Guards. A typed name is saved with the slip when provided.
+
+The dashboard intentionally omits the outstanding balance card. The ledger still
+tracks collections and the Weekly report can show an as-of outstanding amount.
 
 Sales and collections are intentionally separate. Entering a credit slip increases
 sales and outstanding debt; it does not mean the money has been collected. Cash slips
