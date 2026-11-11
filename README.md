@@ -34,6 +34,10 @@ Open `http://127.0.0.1:3000` and log in as `admin` with that password. Keep Powe
 open while using the app; press `Ctrl+C` to stop it. The password variable is used only
 when creating a new database. On later runs, simply use `node src/server.js`.
 
+Do **not** open `web/index.html` directly or use VS Code Live Server: those can show
+the page and CSS but cannot handle `/api/login`, resulting in HTTP 405. Confirm the
+correct server at `http://127.0.0.1:3000/api/health` (it returns JSON).
+
 To create optional sample accounts and menu items after the database exists:
 
 ```powershell
@@ -45,6 +49,11 @@ This creates `demo.admin`, `demo.cashier`, `demo.guard`, and `demo.buyer` with t
 password. It does not change existing accounts. Do not use demo accounts for real
 financial records. Administrators can create and edit actual accounts in the **Accounts** tab;
 there is no public registration page.
+
+Passwords cannot be viewed in the app or database as plain text; only password hashes
+are stored. The demo password is the value you supplied in `CANTEEN_DEMO_PASSWORD`
+when seeding. If you forgot a user's password, log in as admin and set a new one in
+**Accounts → Edit**.
 
 Data lives in `data/canteen.sqlite` and is excluded from Git. Set `CANTEEN_DATA_DIR`
 to choose another data folder and `PORT` to change the listening port. Run tests with

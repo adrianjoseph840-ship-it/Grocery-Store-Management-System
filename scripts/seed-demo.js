@@ -1,3 +1,4 @@
+// Optional local-only sample data. Existing usernames and passwords are never overwritten.
 import { DatabaseSync } from "node:sqlite";
 import { scryptSync, randomBytes, randomUUID } from "node:crypto";
 import { join } from "node:path";

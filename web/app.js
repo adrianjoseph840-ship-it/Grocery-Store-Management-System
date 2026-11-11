@@ -35,6 +35,10 @@ async function act(fn) {
 const form = (event) => Object.fromEntries(new FormData(event.target));
 async function boot() {
   try {
+    // Detect VS Code Live Server and other static previews before login.
+    await request("/health");
+    $("#loginForm button").disabled = false;
+    $("#loginForm button").textContent = "Log in";
     me = await request("/me");
     showApp();
   } catch (error) {
@@ -44,6 +48,7 @@ async function boot() {
     if (error.status !== 401) {
       $("#loginError").textContent = error.message;
       $("#loginError").hidden = false;
+      $("#loginForm button").disabled = true;
     }
   }
 }

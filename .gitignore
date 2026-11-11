@@ -1,3 +1,4 @@
+# Local financial records and dependencies must never be committed.
 data/
 node_modules/
 .env

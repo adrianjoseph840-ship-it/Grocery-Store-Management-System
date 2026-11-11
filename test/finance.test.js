@@ -1,3 +1,4 @@
+// Financial invariants: split tender, debt balance, payment, and cash reconciliation.
 import test from "node:test";
 import assert from "node:assert/strict";
 import {

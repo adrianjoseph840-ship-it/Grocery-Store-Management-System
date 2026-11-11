@@ -41,6 +41,10 @@ When debugging `Unexpected end of JSON input`, check these in order:
 4. In the browser Network tab, inspect the failing `/api/` request's status and body.
 5. Check the PowerShell window for a server exception.
 
+HTTP 405 on `POST /api/login` usually means a static preview or Live Server is
+handling the request. The app checks `/api/health` before enabling the login button
+and displays a startup hint when the API is missing.
+
 The browser client now shows an error message if the body is empty or not JSON rather
 than exposing the browser's `Response.json()` exception.
 
