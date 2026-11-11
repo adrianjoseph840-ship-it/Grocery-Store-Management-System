@@ -6,7 +6,14 @@
     "test": "node --test",
     "check": "node --check src/finance.js && node --check src/server.js && node --check web/app.js",
     "start": "node src/server.js",
-    "seed:demo": "node scripts/seed-demo.js"
+    "seed:demo": "node scripts/seed-demo.js",
+    "format": "prettier --write src web test scripts package.json",
+    "format:check": "prettier --check src web test scripts package.json"
   },
-  "engines": { "node": ">=22" }
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.10"
+  }
 }

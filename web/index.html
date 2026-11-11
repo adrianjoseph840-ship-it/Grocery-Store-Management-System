@@ -1,57 +1,96 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#123d32">
-  <title>Canteen Ledger</title>
-  <link rel="stylesheet" href="/style.css">
-  <link rel="stylesheet" href="/theme.css">
-</head>
-<body class="login-mode">
-  <header class="topbar">
-    <div class="topbar-inner">
-      <div class="brand-wrap"><span class="brand-mark" aria-hidden="true">C</span><div><span class="brand">Canteen Ledger</span><small>Sales and accounts workspace</small></div></div>
-      <div id="identity"></div>
-    </div>
-  </header>
-  <main>
-    <section id="login" class="login-layout">
-      <div class="login-story">
-        <div class="story-top"><span class="story-icon" aria-hidden="true">C</span><span>THE CANTEEN WORKSPACE</span></div>
-        <div class="story-content">
-          <div class="story-kicker">A clearer day at the counter</div>
-          <h1>Every sale accounted for.<br><em>Every balance in view.</em></h1>
-          <p>Keep the queue moving while cash, staff tabs, and settlements stay organized in one secure workspace.</p>
-          <div class="story-preview" aria-hidden="true">
-            <div class="preview-head"><span>Today's overview</span><span class="preview-dot"></span></div>
-            <div class="preview-bars"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
-            <div class="preview-foot"><span>Cash sales</span><strong>Live tracking</strong></div>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#123d32" />
+    <title>Canteen Ledger</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="theme.css" />
+  </head>
+  <body class="login-mode">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="brand-wrap">
+          <span class="brand-mark" aria-hidden="true">C</span>
+          <div>
+            <span class="brand">Canteen Ledger</span
+            ><small>Sales and accounts workspace</small>
           </div>
         </div>
-        <div class="story-bottom">Canteen Ledger · Built for daily operations</div>
+        <div id="identity"></div>
       </div>
-      <div class="login-form-panel">
-        <div class="login-form-inner">
-          <div class="eyebrow">WELCOME BACK</div>
-          <h2>Log in to your account</h2>
-          <p>Use the account your administrator created for you.</p>
-          <form id="loginForm">
-            <label>Username<input name="username" required autocomplete="username" placeholder="Enter your username" autofocus></label>
-            <label>Password<input name="password" type="password" required autocomplete="current-password" placeholder="Enter your password"></label>
-            <button class="full-width">Log in</button>
-          </form>
-          <p id="loginError" class="error" role="alert" hidden></p>
-          <div class="login-help">Need access? Ask your canteen administrator to create an account.</div>
+    </header>
+    <main>
+      <section id="login" class="login-layout">
+        <div class="login-story">
+          <div class="story-top">
+            <span class="story-icon" aria-hidden="true">C</span
+            ><span>THE CANTEEN WORKSPACE</span>
+          </div>
+          <div class="story-content">
+            <div class="story-kicker">A clearer day at the counter</div>
+            <h1>
+              Every sale accounted for.<br /><em>Every balance in view.</em>
+            </h1>
+            <p>
+              Keep the queue moving while cash, staff tabs, and settlements stay
+              organized in one secure workspace.
+            </p>
+            <div class="story-preview" aria-hidden="true">
+              <div class="preview-head">
+                <span>Today's overview</span><span class="preview-dot"></span>
+              </div>
+              <div class="preview-bars">
+                <span></span><span></span><span></span><span></span><span></span
+                ><span></span><span></span>
+              </div>
+              <div class="preview-foot">
+                <span>Cash sales</span><strong>Live tracking</strong>
+              </div>
+            </div>
+          </div>
+          <div class="story-bottom">
+            Canteen Ledger · Built for daily operations
+          </div>
         </div>
+        <div class="login-form-panel">
+          <div class="login-form-inner">
+            <div class="eyebrow">WELCOME BACK</div>
+            <h2>Log in to your account</h2>
+            <p>Use the account your administrator created for you.</p>
+            <form id="loginForm">
+              <label
+                >Username<input
+                  name="username"
+                  required
+                  autocomplete="username"
+                  placeholder="Enter your username"
+                  autofocus
+              /></label>
+              <label
+                >Password<input
+                  name="password"
+                  type="password"
+                  required
+                  autocomplete="current-password"
+                  placeholder="Enter your password"
+              /></label>
+              <button class="full-width">Log in</button>
+            </form>
+            <p id="loginError" class="error" role="alert" hidden></p>
+            <div class="login-help">
+              Need access? Ask your canteen administrator to create an account.
+            </div>
+          </div>
+        </div>
+      </section>
+      <div id="app" hidden>
+        <nav id="nav" aria-label="Main navigation"></nav>
+        <p id="notice" role="status" aria-live="polite"></p>
+        <section id="view"></section>
       </div>
-    </section>
-    <div id="app" hidden>
-      <nav id="nav" aria-label="Main navigation"></nav>
-      <p id="notice" role="status" aria-live="polite"></p>
-      <section id="view"></section>
-    </div>
-  </main>
-  <script type="module" src="/app.js"></script>
-</body>
+    </main>
+    <script type="module" src="app.js"></script>
+  </body>
 </html>

@@ -8,10 +8,11 @@ paper-debt migration, settlement tracking, verification, and financial reporting
 - [System architecture](docs/architecture.md)
 - [PostgreSQL schema](docs/schema.sql)
 - [Implementation roadmap](docs/implementation-roadmap.md)
+- [Developer guide and troubleshooting](docs/development.md)
 
 ## Stack
 
-Node.js (no external packages), SQLite, HTML, CSS, and JavaScript. The app runs on
+Node.js (no runtime packages), SQLite, HTML, CSS, and JavaScript. The app runs on
 one local machine. The PostgreSQL documentation describes a future larger deployment.
 
 ## Run locally
@@ -42,12 +43,20 @@ node scripts/seed-demo.js
 
 This creates `demo.admin`, `demo.cashier`, `demo.guard`, and `demo.buyer` with that
 password. It does not change existing accounts. Do not use demo accounts for real
-financial records. Administrators can create actual accounts in the **Team** tab;
+financial records. Administrators can create and edit actual accounts in the **Accounts** tab;
 there is no public registration page.
 
 Data lives in `data/canteen.sqlite` and is excluded from Git. Set `CANTEEN_DATA_DIR`
 to choose another data folder and `PORT` to change the listening port. Run tests with
-`node --test`.
+`node --test`. For code formatting, run `npm.cmd install` once, then
+`npm.cmd run format`.
+
+### Add or edit an account
+
+Log in with an admin account, open **Accounts**, and use **Create account**. Select a
+role, section, and optional credit limit. To edit an existing account, click **Edit**
+beside it. You can change its role, section, credit settings, active status, or set a
+new password. A password reset logs that user out of existing sessions.
 
 ## Implemented workflows
 
@@ -65,7 +74,7 @@ can be searched by name or username.
 The runtime stores transactions in SQLite using atomic writes; `docs/schema.sql` is a
 PostgreSQL reference for a later deployment migration. The local server binds to
 `127.0.0.1` and is intended for one machine or a trusted local pilot. Public hosting,
-multi-terminal concurrency, backups, password reset, full approval workflows, and
+multi-terminal concurrency, backups, self-service password reset, full approval workflows, and
 partial refunds require further work before production use. Sale voids require an
 admin, an open admin drawer for cash refunds, and no later buyer payment when debt is
 involved; this conservative rule avoids allocating repayments to the wrong charge.
@@ -81,23 +90,4 @@ involved; this conservative rule avoids allocating repayments to the wrong charg
 5. Closing reports use the canteen's configured business timezone and immutable
    shift snapshots.
 
-## Local Git and GitHub
-
-This directory can be initialized locally with:
-
-```powershell
-git init
-git add README.md docs
-git commit -m "docs: define canteen system architecture"
-```
-
-Before pushing, create or select a GitHub repository and add it as `origin`, or use
-GitHub CLI if authenticated:
-
-```powershell
-gh repo create canteen-management-system --private --source . --remote origin --push
-```
-
-Repository creation and pushing should only be done after confirming the target
-GitHub account/organization and repository visibility.
 
