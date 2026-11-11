@@ -14,10 +14,11 @@ test('cashier sale and settlement reconcile in persistent API', async () => {
   const base = `http://127.0.0.1:${port}/api`;
   let cookie;
   let stage = 'startup';
-  async function call(path, method = 'GET', data) {
+  async function call(path, method = 'GET', data, expectedStatus) {
     stage = `${method} ${path}`;
     const response = await fetch(base + path, { method, headers: { ...(cookie ? { cookie } : {}), ...(data ? { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID() } : {}) }, body: data ? JSON.stringify(data) : undefined });
     const value = await response.json();
+    if (expectedStatus) { assert.equal(response.status, expectedStatus); return value; }
     if (!response.ok) throw new Error(`${response.status} ${JSON.stringify(value)}`);
     if (response.headers.get('set-cookie')) cookie = response.headers.get('set-cookie').split(';')[0];
     return value;
@@ -40,6 +41,14 @@ test('cashier sale and settlement reconcile in persistent API', async () => {
     assert.equal((await call(`/buyers/${buyer.id}`)).balanceMinor, 5000);
     const summary = await call('/reports/summary');
     assert.deepEqual([summary.gross, summary.cash, summary.debt, summary.outstanding], [10000, 3000, 7000, 5000]);
+    const blocked = await call(`/sales/${sale.id}/void`, 'POST', { reason: 'Customer returned meal' }, 400);
+    assert.match(blocked.error, /later payment/);
+    const cashSale = await call('/sales', 'POST', { lines: [{ itemId: item.id, quantity: 1 }], tenders: [{ type: 'CASH', amountMinor: 10000 }] });
+    const voided = await call(`/sales/${cashSale.id}/void`, 'POST', { reason: 'Wrong item entered' });
+    assert.deepEqual([voided.status, voided.cashRefundMinor], ['VOIDED', 10000]);
+    const date = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+    const period = await call(`/reports/period?from=${date}&to=${date}`);
+    assert.deepEqual([period.gross, period.cash, period.debt, period.settled], [10000, 3000, 7000, 2000]);
     const close = await call('/drawers/close', 'POST', { countedMinor: 10000 });
     assert.equal(close.varianceMinor, 0);
   } catch (error) {

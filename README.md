@@ -40,7 +40,7 @@ and is excluded from Git. Set `CANTEEN_DATA_DIR` to choose another data folder a
 ## Implemented workflows
 
 - Admin: financial overview, section and user creation, menu management, paper debt
-  import, buyer accounts, and audit log.
+  import, buyer accounts, sale voids, date range reports, and audit log.
 - Cashier: drawer opening/closing, cash and split cash/debt checkout, buyer accounts,
   and partial cash settlements.
 - Guard: minimal buyer debt/restriction status lookup.
@@ -50,7 +50,9 @@ The runtime stores transactions in SQLite using atomic writes; `docs/schema.sql`
 PostgreSQL reference for a later deployment migration. The local server binds to
 `127.0.0.1` and is intended for one machine or a trusted local pilot. Public hosting,
 multi-terminal concurrency, backups, password reset, full approval workflows, and
-refunds/voids require further work before production use.
+partial refunds require further work before production use. Sale voids require an
+admin, an open admin drawer for cash refunds, and no later buyer payment when debt is
+involved; this conservative rule avoids allocating repayments to the wrong charge.
 
 ## Financial invariants
 
