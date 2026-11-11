@@ -23,13 +23,34 @@ Start as a modular monolith. It is easier to deploy and keep financial operation
 transactional than microservices, while module boundaries leave room to split out
 reporting or notifications later.
 
-## Current implementation
+## Run locally
 
-The first code slice is the dependency-free financial domain module in
-`src/finance.js`. It validates sale totals and tender splits, credit limits, debt
-payments, payment allocation, drawer closing, and financial summaries. Run its
-tests with `node --test`. It does not yet connect to PostgreSQL or expose an API;
-the SQL schema is a reference for the next backend milestone.
+Requires Node.js 22 or newer. In PowerShell:
+
+```powershell
+$env:CANTEEN_ADMIN_PASSWORD = "choose-a-strong-unique-password"
+node src/server.js
+```
+
+Open `http://127.0.0.1:3000`, then sign in as `admin` with that password. The password
+is only used when the database is first created. Data lives in `data/canteen.sqlite`
+and is excluded from Git. Set `CANTEEN_DATA_DIR` to choose another data folder and
+`PORT` to change the listening port. Run tests with `node --test`.
+
+## Implemented workflows
+
+- Admin: financial overview, section and user creation, menu management, paper debt
+  import, buyer accounts, and audit log.
+- Cashier: drawer opening/closing, cash and split cash/debt checkout, buyer accounts,
+  and partial cash settlements.
+- Guard: minimal buyer debt/restriction status lookup.
+- Buyer: own balance and ledger history.
+
+The runtime stores transactions in SQLite using atomic writes; `docs/schema.sql` is a
+PostgreSQL reference for a later deployment migration. The local server binds to
+`127.0.0.1` and is intended for one machine or a trusted local pilot. Public hosting,
+multi-terminal concurrency, backups, password reset, full approval workflows, and
+refunds/voids require further work before production use.
 
 ## Financial invariants
 
