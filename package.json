@@ -1,0 +1,10 @@
+{
+  "name": "canteen-management-system",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check src/finance.js"
+  },
+  "engines": { "node": ">=22" }
+}

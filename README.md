@@ -23,6 +23,14 @@ Start as a modular monolith. It is easier to deploy and keep financial operation
 transactional than microservices, while module boundaries leave room to split out
 reporting or notifications later.
 
+## Current implementation
+
+The first code slice is the dependency-free financial domain module in
+`src/finance.js`. It validates sale totals and tender splits, credit limits, debt
+payments, payment allocation, drawer closing, and financial summaries. Run its
+tests with `node --test`. It does not yet connect to PostgreSQL or expose an API;
+the SQL schema is a reference for the next backend milestone.
+
 ## Financial invariants
 
 1. A sale, payment, refund, or adjustment is never silently edited or deleted.
