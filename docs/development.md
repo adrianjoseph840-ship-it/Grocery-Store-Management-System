@@ -6,16 +6,21 @@
 | --- | --- |
 | `src/server.js` | HTTP routes, local SQLite schema, sessions, and role checks |
 | `src/finance.js` | Integer money, tender, balance, and drawer rules |
+| `src/paper.js` | Paper fields, people, slips, collections, and period totals |
 | `web/index.html` | Login and application shell |
 | `web/style.css`, `web/theme.css` | Base layout and visual theme |
 | `web/api.js` | Browser HTTP client and response error handling |
 | `web/app.js` | Role screens and interaction handlers |
+| `web/paper-ui.js`, `web/paper.css` | Paper dashboard, entry screens, and styles |
 | `scripts/seed-demo.js` | Optional local demo users and menu data |
 
 The server listens on `127.0.0.1` by default. It serves browser files from `web/`
 and JSON endpoints under `/api/`. The page links `style.css` and `theme.css` relative
-to the app root; `app.js` imports `api.js`. All paths are explicitly allowed by the
+to the app root; `app.js` imports `api.js` and `paper-ui.js`. All paths are explicitly allowed by the
 static file handler in `src/server.js`.
+
+The paper workflow uses `/api/paper/*` routes. Its tables are created additively on
+startup, preserving older POS records. The dashboard does not mix the two ledgers.
 
 ## Accounts
 

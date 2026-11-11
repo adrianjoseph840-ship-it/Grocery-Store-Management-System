@@ -1,5 +1,9 @@
 # System Architecture
 
+> The active user workflow is now the paper-slip ledger described in
+> [Paper slip workflow](paper-workflow.md). The POS design below is retained as
+> historical planning context and for the older tables that remain in the database.
+
 ## 1. Scope and terminology
 
 - **Buyer:** staff/personnel allowed to purchase; belongs to a section and buyer tier.

@@ -1,4 +1,5 @@
 import { request } from "./api.js";
+import { renderPaperPage } from "./paper-ui.js";
 
 // UI rendering stays role-specific; every permission is also checked by the API.
 const $ = (selector) => document.querySelector(selector);
@@ -65,17 +66,22 @@ async function showApp() {
   const tabs =
     me.role === "ADMIN"
       ? [
-          "Overview",
-          "POS",
-          "Sales",
-          "Reports",
-          "Buyers",
-          "Menu",
+          "Dashboard",
+          "Paper slips",
+          "People & fields",
+          "Collections",
+          "Weekly report",
           "Accounts",
           "Audit",
         ]
       : me.role === "CASHIER"
-        ? ["POS", "Sales", "Buyers"]
+        ? [
+            "Dashboard",
+            "Paper slips",
+            "People & fields",
+            "Collections",
+            "Weekly report",
+          ]
         : me.role === "GUARD"
           ? ["Verify"]
           : ["My account"];
@@ -97,6 +103,16 @@ async function showApp() {
 async function render(tab) {
   notice("");
   try {
+    if (
+      [
+        "Dashboard",
+        "Paper slips",
+        "People & fields",
+        "Collections",
+        "Weekly report",
+      ].includes(tab)
+    )
+      return await renderPaperPage(tab, $("#view"), notice, me.role);
     // Await each screen so connection failures land in the visible status area.
     if (tab === "Overview") return await overview();
     if (tab === "POS") return await pos();

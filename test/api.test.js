@@ -71,6 +71,13 @@ test("cashier sale and settlement reconcile in persistent API", async () => {
     assert.match(html, /aria-label="Main navigation"/);
     assert.match(html, /href="style.css"/);
     assert.match(html, /href="theme.css"/);
+    assert.match(html, /href="paper.css"/);
+    const paperStyles = await fetch(`http://127.0.0.1:${port}/paper.css`);
+    assert.equal(paperStyles.status, 200);
+    assert.match(await paperStyles.text(), /field-directory/);
+    const paperModule = await fetch(`http://127.0.0.1:${port}/paper-ui.js`);
+    assert.equal(paperModule.status, 200);
+    assert.match(await paperModule.text(), /renderPaperPage/);
     const theme = await fetch(`http://127.0.0.1:${port}/theme.css`);
     assert.equal(theme.status, 200);
     assert.match(await theme.text(), /login-story/);
@@ -84,6 +91,94 @@ test("cashier sale and settlement reconcile in persistent API", async () => {
       username: "admin",
       password: "TestPassword123456",
     });
+    // Paper slips are grouped by field and person; collections reduce the exact slip.
+    const fields = await call("/paper/fields");
+    assert.deepEqual(
+      fields.map((f) => f.name).sort(),
+      [
+        "Admin",
+        "Agency",
+        "Cash",
+        "Driver",
+        "Extra",
+        "Guards",
+        "Operation",
+      ].sort(),
+    );
+    const guardField = fields.find((f) => f.name === "Guards");
+    const cashField = fields.find((f) => f.name === "Cash");
+    const guardA = await call("/paper/people", "POST", {
+      name: "Guard A",
+      fieldId: guardField.id,
+    });
+    const guardB = await call("/paper/people", "POST", {
+      name: "Guard B",
+      fieldId: guardField.id,
+    });
+    const paperDate = "2026-11-11";
+    const slipA = await call("/paper/slips", "POST", {
+      personId: guardA.id,
+      fieldId: guardField.id,
+      amountMinor: 12000,
+      slipDate: paperDate,
+    });
+    await call("/paper/slips", "POST", {
+      personId: guardB.id,
+      fieldId: guardField.id,
+      amountMinor: 8000,
+      slipDate: paperDate,
+    });
+    await call("/paper/slips", "POST", {
+      fieldId: cashField.id,
+      amountMinor: 5000,
+      slipDate: paperDate,
+    });
+    await call("/paper/collections", "POST", {
+      slipId: slipA.id,
+      amountMinor: 4000,
+      method: "PAYROLL",
+      collectionDate: paperDate,
+    });
+    const overpaid = await call(
+      "/paper/collections",
+      "POST",
+      {
+        slipId: slipA.id,
+        amountMinor: 9000,
+        method: "PAYROLL",
+        collectionDate: paperDate,
+      },
+      400,
+    );
+    assert.match(overpaid.error, /exceeds remaining/);
+    const paperReport = await call(
+      `/paper/report?from=${paperDate}&to=${paperDate}`,
+    );
+    assert.deepEqual(
+      [
+        paperReport.salesMinor,
+        paperReport.collectedMinor,
+        paperReport.outstandingMinor,
+      ],
+      [25000, 9000, 16000],
+    );
+    assert.equal(
+      paperReport.fields.find((f) => f.name === "Guards").salesMinor,
+      20000,
+    );
+    await call("/paper/collections", "POST", {
+      slipId: slipA.id,
+      amountMinor: 2000,
+      method: "PAYROLL",
+      collectionDate: "2026-11-12",
+    });
+    const partWeek = await call("/paper/report?from=2026-11-12&to=2026-11-12");
+    assert.deepEqual(
+      [partWeek.salesMinor, partWeek.collectedMinor, partWeek.outstandingMinor],
+      [0, 2000, 14000],
+    );
+    const custom = await call("/paper/fields", "POST", { name: "Maintenance" });
+    assert.equal(custom.name, "Maintenance");
     const section = await call("/sections", "POST", { name: "Tracking" });
     const buyer = await call("/users", "POST", {
       name: "Test Buyer",

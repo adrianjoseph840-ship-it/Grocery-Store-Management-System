@@ -14,6 +14,7 @@ import {
   quoteSale,
   reconcileDrawer,
 } from "./finance.js";
+import { createPaperService } from "./paper.js";
 
 // Local deployment: SQLite keeps cash, debt, and audit records in one database.
 // Amounts are integer centavos throughout the application.
@@ -98,6 +99,8 @@ function bootstrap() {
   audit(admin, "BOOTSTRAP", admin);
 }
 bootstrap();
+// New paper-slip tables are additive; existing POS and user records remain intact.
+const paper = createPaperService(db, { audit, transactional, appError });
 
 function authentication(req) {
   const cookie = req.headers.cookie
@@ -180,6 +183,55 @@ async function api(req, res, path) {
     });
   }
   const user = authentication(req);
+  // The paper workflow is intentionally separate from the older menu POS routes.
+  if (path.startsWith("/api/paper/")) {
+    if (method === "GET" && path === "/api/paper/fields") {
+      roles(user, "ADMIN", "CASHIER", "GUARD");
+      return json(res, 200, paper.listFields());
+    }
+    if (method === "POST" && path === "/api/paper/fields") {
+      roles(user, "ADMIN");
+      return json(res, 201, paper.addField(await body(req), user.id));
+    }
+    if (method === "GET" && path === "/api/paper/people") {
+      roles(user, "ADMIN", "CASHIER", "GUARD");
+      return json(res, 200, paper.listPeople());
+    }
+    if (method === "POST" && path === "/api/paper/people") {
+      roles(user, "ADMIN", "CASHIER");
+      return json(res, 201, paper.addPerson(await body(req), user.id));
+    }
+    if (method === "GET" && path === "/api/paper/slips") {
+      roles(user, "ADMIN", "CASHIER");
+      return json(res, 200, paper.listSlips());
+    }
+    if (method === "POST" && path === "/api/paper/slips") {
+      roles(user, "ADMIN", "CASHIER");
+      return json(
+        res,
+        201,
+        paper.addSlip(await body(req), user.id, req.headers["idempotency-key"]),
+      );
+    }
+    if (method === "POST" && path === "/api/paper/collections") {
+      roles(user, "ADMIN", "CASHIER");
+      return json(
+        res,
+        201,
+        paper.addCollection(
+          await body(req),
+          user.id,
+          req.headers["idempotency-key"],
+        ),
+      );
+    }
+    if (method === "GET" && path === "/api/paper/report") {
+      roles(user, "ADMIN", "CASHIER");
+      const query = new URL(req.url, "http://localhost").searchParams;
+      return json(res, 200, paper.report(query.get("from"), query.get("to")));
+    }
+    throw appError("Paper route not found", 404);
+  }
   if (method === "POST" && path === "/api/logout") {
     const token = req.headers.cookie?.match(/canteen_session=([^;]+)/)?.[1];
     if (token)
@@ -834,9 +886,15 @@ const server = http.createServer(async (req, res) => {
     if (req.method !== "GET") throw appError("Method not allowed", 405);
     const file = url.pathname === "/" ? "index.html" : url.pathname.slice(1);
     if (
-      !["index.html", "app.js", "api.js", "style.css", "theme.css"].includes(
-        file,
-      )
+      ![
+        "index.html",
+        "app.js",
+        "api.js",
+        "paper-ui.js",
+        "style.css",
+        "theme.css",
+        "paper.css",
+      ].includes(file)
     )
       throw appError("Not found", 404);
     const mime = {

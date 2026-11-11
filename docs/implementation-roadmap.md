@@ -1,5 +1,9 @@
 # Implementation Roadmap
 
+> The current application uses the paper-slip workflow in
+> [Paper slip workflow](paper-workflow.md). This earlier POS roadmap is retained as
+> background rather than a description of the main dashboard.
+
 ## Phase 0 — Confirm business rules
 
 Agree on currency/timezone, tier limits, debt eligibility, settlement approval,

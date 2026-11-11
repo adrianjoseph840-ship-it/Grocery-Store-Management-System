@@ -1,4 +1,5 @@
--- PostgreSQL reference schema. Adapt naming to the selected ORM migration format.
+-- Earlier POS PostgreSQL reference schema. The active paper-slip ledger is
+-- implemented in src/paper.js; this schema is retained for the legacy POS design.
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TYPE user_status AS ENUM ('ACTIVE', 'SUSPENDED', 'ARCHIVED');
