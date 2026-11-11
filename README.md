@@ -46,6 +46,10 @@ and is excluded from Git. Set `CANTEEN_DATA_DIR` to choose another data folder a
 - Guard: minimal buyer debt/restriction status lookup.
 - Buyer: own balance and ledger history.
 
+The responsive cashier screen supports menu search, quantity controls, buyer credit
+context, a live cash/tab split, and a confirmation step before posting. Buyer accounts
+can be searched by name or username.
+
 The runtime stores transactions in SQLite using atomic writes; `docs/schema.sql` is a
 PostgreSQL reference for a later deployment migration. The local server binds to
 `127.0.0.1` and is intended for one machine or a trusted local pilot. Public hosting,

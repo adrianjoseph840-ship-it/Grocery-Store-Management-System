@@ -29,6 +29,12 @@ test('cashier sale and settlement reconcile in persistent API', async () => {
       try { await fetch(base + '/me'); ready = true; break; } catch { await new Promise(resolve => setTimeout(resolve, 50)); }
     }
     assert.ok(ready, 'server started');
+    const page = await fetch(`http://127.0.0.1:${port}/`);
+    assert.equal(page.status, 200);
+    assert.match(await page.text(), /aria-label="Main navigation"/);
+    const styles = await fetch(`http://127.0.0.1:${port}/style.css`);
+    assert.equal(styles.status, 200);
+    assert.match(await styles.text(), /pos-grid/);
     await call('/login', 'POST', { username: 'admin', password: 'TestPassword123456' });
     const section = await call('/sections', 'POST', { name: 'Tracking' });
     const buyer = await call('/users', 'POST', { name: 'Test Buyer', username: 'buyer', password: 'BuyerPassword123', role: 'BUYER', sectionId: section.id, creditLimitMinor: 20000, creditAllowed: true });

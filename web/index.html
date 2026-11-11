@@ -1,1 +1,36 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Canteen Ledger</title><link rel="stylesheet" href="/style.css"></head><body><header><div><span class="brand">◈ Canteen Ledger</span><small>Cash, tabs and accountability in one place</small></div><div id="identity"></div></header><main><section id="login" class="card login"><h1>Welcome back</h1><p>Sign in to your canteen workspace.</p><form id="loginForm"><label>Username<input name="username" required autocomplete="username"></label><label>Password<input name="password" type="password" required autocomplete="current-password"></label><button>Sign in</button></form></section><div id="app" hidden><nav id="nav"></nav><p id="notice" role="status"></p><section id="view"></section></div></main><script type="module" src="/app.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#123d32">
+  <title>Canteen Ledger</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand-wrap"><span class="brand-mark" aria-hidden="true">C</span><div><span class="brand">Canteen Ledger</span><small>Sales and accounts workspace</small></div></div>
+      <div id="identity"></div>
+    </div>
+  </header>
+  <main>
+    <section id="login" class="card login">
+      <div class="eyebrow">STAFF ACCESS</div>
+      <h1>Welcome back</h1>
+      <p>Sign in to continue to your canteen workspace.</p>
+      <form id="loginForm">
+        <label>Username<input name="username" required autocomplete="username" autofocus></label>
+        <label>Password<input name="password" type="password" required autocomplete="current-password"></label>
+        <button class="full-width">Sign in</button>
+      </form>
+    </section>
+    <div id="app" hidden>
+      <nav id="nav" aria-label="Main navigation"></nav>
+      <p id="notice" role="status" aria-live="polite"></p>
+      <section id="view"></section>
+    </div>
+  </main>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
