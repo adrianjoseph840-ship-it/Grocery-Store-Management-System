@@ -44,7 +44,7 @@ export async function renderPaperPage(tab, view, notice, role) {
   if (tab === "Dashboard") return dashboard(view);
   if (tab === "Paper slips") return sheetPage(view, notice, run);
   if (tab === "People & departments") return peoplePage(view, notice, run, role);
-  if (tab === "Debt monitor") return debtMonitorPage(view);
+  if (tab === "Debt monitor") return debtMonitorPage(view, notice, run);
   if (tab === "Weekly report") return reportPage(view, notice, run);
 }
 
@@ -215,10 +215,11 @@ async function peoplePage(view, notice, run, role) {
     };
 }
 
-async function debtMonitorPage(view) {
-  const [people, slips] = await Promise.all([
+async function debtMonitorPage(view, notice, run) {
+  const [people, slips, fields] = await Promise.all([
     request("/paper/people"),
     request("/paper/slips"),
+    request("/paper/fields"),
   ]);
   const sorted = [...people].sort(
     (a, b) => b.outstanding_minor - a.outstanding_minor || a.name.localeCompare(b.name),
@@ -228,15 +229,15 @@ async function debtMonitorPage(view) {
   view.innerHTML = `<div class="page-head"><div><div class="eyebrow">WORKER BALANCES</div><h1>Debt monitor</h1><p>See every registered worker, their total, and every dated record.</p></div><span class="pill">${people.length} workers</span></div>
     <div class="grid paper-kpis">${metric("Total", total, "Across all registered workers")}<div class="card paper-metric"><div class="eyebrow">Workers with a total</div><div class="metric">${debtors}</div><div class="muted">${debtors} of ${people.length} workers</div></div></div>
     <div class="card"><form id="debtMonitorSearch" class="inline"><label>Search by name, employee code, or department<input id="debtMonitorQuery" name="query" type="search" placeholder="Start typing to locate a worker" autocomplete="off"></label><button type="submit">Search</button></form></div>
-    <div class="card"><div class="table-wrap"><table><thead><tr><th>Worker</th><th>Employee code</th><th>Department</th><th>Total</th></tr></thead><tbody id="debtMonitorRows"></tbody></table></div></div><div id="debtRecordResults"></div>`;
+    <div class="card"><div class="table-wrap"><table><thead><tr><th>Worker</th><th>Employee code</th><th>Department</th><th>Total</th><th>Action</th></tr></thead><tbody id="debtMonitorRows"></tbody></table></div></div><div id="debtRecordResults"></div>`;
   const draw = () => {
     const query = $("#debtMonitorQuery").value.trim().toLowerCase();
     const matches = sorted.filter((person) =>
       `${person.name} ${person.employee_code || ""} ${person.field_name}`.toLowerCase().includes(query),
     );
     $("#debtMonitorRows").innerHTML = matches.length
-      ? matches.map((person) => `<tr><td><strong>${esc(person.name)}</strong></td><td>${esc(person.employee_code || "—")}</td><td>${esc(person.field_name)}</td><td class="debt-value ${person.outstanding_minor > 0 ? "has-debt" : ""}">${pesos(person.outstanding_minor)}</td></tr>`).join("")
-      : '<tr><td colspan="4"><div class="empty">No matching worker found.</div></td></tr>';
+      ? matches.map((person) => `<tr><td><strong>${esc(person.name)}</strong></td><td>${esc(person.employee_code || "—")}</td><td>${esc(person.field_name)}</td><td class="debt-value ${person.outstanding_minor > 0 ? "has-debt" : ""}">${pesos(person.outstanding_minor)}</td><td><button type="button" class="secondary" data-monitor-edit="${person.id}">Edit</button></td></tr>`).join("")
+      : '<tr><td colspan="5"><div class="empty">No matching worker found.</div></td></tr>';
     $("#debtRecordResults").innerHTML = query
       ? matches.map((person) => {
           const records = slips.filter((slip) =>
@@ -246,6 +247,32 @@ async function debtMonitorPage(view) {
           return `<div class="card"><div class="page-head"><div><h2>${esc(person.name)}</h2><p>${esc(person.field_name)} department</p></div><strong class="debt-value ${person.outstanding_minor > 0 ? "has-debt" : ""}">Total: ${pesos(person.outstanding_minor)}</strong></div><div class="table-wrap"><table><thead><tr><th>Exact date</th><th>Slip amount</th><th>Collected</th><th>Total</th></tr></thead><tbody>${records.length ? records.map((record) => `<tr><td>${esc(record.slip_date)}</td><td>${pesos(record.amount_minor)}</td><td>${pesos(record.collected_minor)}</td><td class="debt-value ${(record.amount_minor - record.collected_minor) > 0 ? "has-debt" : ""}">${pesos(record.amount_minor - record.collected_minor)}</td></tr>`).join("") : '<tr><td colspan="4" class="muted">No records for this person.</td></tr>'}</tbody></table></div></div>`;
         }).join("")
       : '<div class="card empty">Search for a person to see all exact dates and records.</div>';
+    view.querySelectorAll("[data-monitor-edit]").forEach((button) => {
+      button.onclick = () => {
+        const person = people.find((item) => item.id === button.dataset.monitorEdit);
+        const name = prompt("Worker name:", person.name);
+        if (name === null) return;
+        const employeeCode = prompt("Employee code (optional):", person.employee_code || "");
+        if (employeeCode === null) return;
+        const departmentName = prompt(
+          `Department (${fields.filter((field) => field.kind === "CREDIT").map((field) => field.name).join(", ")}):`,
+          person.field_name,
+        );
+        if (departmentName === null) return;
+        const department = fields.find(
+          (field) => field.kind === "CREDIT" && field.name.toLowerCase() === departmentName.trim().toLowerCase(),
+        );
+        if (!department) return notice("Enter an existing payroll department name.", true);
+        run(async () => {
+          await request(`/paper/people/${person.id}`, {
+            method: "PATCH",
+            body: JSON.stringify({ name, employeeCode, fieldId: department.id }),
+          });
+          await debtMonitorPage(view, notice, run);
+          notice("Worker updated.");
+        });
+      };
+    });
   };
   $("#debtMonitorQuery").oninput = draw;
   $("#debtMonitorSearch").onsubmit = (event) => {
