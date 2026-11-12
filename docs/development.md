@@ -31,7 +31,9 @@ Only an administrator can call `POST /api/users` or `PATCH /api/users/:id`. The 
 exposes these actions in **Accounts**. There is no public registration endpoint.
 
 Account edits can change identity, role, section, credit limit, restrictions, active
-state, and password. Resetting a password revokes that user's sessions. The API never
+state, and temporary password. New accounts and password resets require the account
+holder to choose a different password before using other API routes. Resetting a
+password revokes that user's sessions. The API never
 returns password hashes. The local database under `data/` is not committed to Git.
 
 ## API response contract

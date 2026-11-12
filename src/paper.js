@@ -110,10 +110,41 @@ export function createPaperService(db, { audit, transactional, appError }) {
     audit(actor, "ADD_PAPER_FIELD", id, { name });
     return { id, name, kind: "CREDIT" };
   }
+  function updateField(fieldId, input, actor) {
+    const current = field(fieldId);
+    if (current.kind === "CASH") throw appError("The Cash field cannot be changed");
+    const name = input.name?.trim();
+    if (!name || name.length > 80)
+      throw appError("Field name must be 1–80 characters");
+    const duplicate = db
+      .prepare("SELECT id FROM paper_fields WHERE name=? COLLATE NOCASE AND id<>?")
+      .get(name, fieldId);
+    if (duplicate) throw appError("Field already exists", 409);
+    db.prepare("UPDATE paper_fields SET name=? WHERE id=?").run(name, fieldId);
+    audit(actor, "UPDATE_PAPER_FIELD", fieldId, { before: current.name, after: name });
+    return { ...current, name };
+  }
+  function deleteField(fieldId, actor) {
+    const current = field(fieldId);
+    if (current.kind === "CASH") throw appError("The Cash field cannot be deleted");
+    const people = db.prepare("SELECT COUNT(*) count FROM paper_people WHERE field_id=?").get(fieldId).count;
+    const slips = db.prepare("SELECT COUNT(*) count FROM paper_slips WHERE field_id=?").get(fieldId).count;
+    if (people || slips)
+      throw appError("Move or delete this field's workers first; fields with slip history cannot be deleted");
+    db.prepare("DELETE FROM paper_fields WHERE id=?").run(fieldId);
+    audit(actor, "DELETE_PAPER_FIELD", fieldId, { name: current.name });
+    return { ok: true };
+  }
   function listPeople() {
     return db
       .prepare(
-        "SELECT p.*,f.name field_name FROM paper_people p JOIN paper_fields f ON f.id=p.field_id ORDER BY f.name,p.name",
+        `SELECT p.*,f.name field_name,
+        COALESCE((SELECT SUM(s.amount_minor) FROM paper_slips s
+          WHERE s.person_id=p.id OR (s.person_id IS NULL AND s.person_name=p.name COLLATE NOCASE AND s.field_id=p.field_id)),0) -
+        COALESCE((SELECT SUM(c.amount_minor) FROM paper_collections c JOIN paper_slips s ON s.id=c.slip_id
+          WHERE s.person_id=p.id OR (s.person_id IS NULL AND s.person_name=p.name COLLATE NOCASE AND s.field_id=p.field_id)),0) outstanding_minor
+        FROM paper_people p JOIN paper_fields f ON f.id=p.field_id
+        ORDER BY f.name,p.name`,
       )
       .all();
   }
@@ -141,6 +172,35 @@ export function createPaperService(db, { audit, transactional, appError }) {
     );
     audit(actor, "ADD_PAPER_PERSON", id, { name, fieldId: input.fieldId });
     return { id, name, employeeCode, fieldId: input.fieldId };
+  }
+  function updatePerson(personId, input, actor) {
+    const current = db.prepare("SELECT * FROM paper_people WHERE id=?").get(personId);
+    if (!current) throw appError("Person not found", 404);
+    const name = input.name?.trim();
+    const employeeCode = input.employeeCode?.trim() || null;
+    if (!name || name.length > 120)
+      throw appError("Person name must be 1–120 characters");
+    if (field(input.fieldId).kind !== "CREDIT")
+      throw appError("Choose a payroll field");
+    const duplicate = employeeCode && db
+      .prepare("SELECT id FROM paper_people WHERE employee_code=? AND id<>?")
+      .get(employeeCode, personId);
+    if (duplicate) throw appError("Employee code already exists", 409);
+    db.prepare("UPDATE paper_people SET name=?,employee_code=?,field_id=? WHERE id=?")
+      .run(name, employeeCode, input.fieldId, personId);
+    audit(actor, "UPDATE_PAPER_PERSON", personId, { name, employeeCode, fieldId: input.fieldId });
+    return { id: personId, name, employeeCode, fieldId: input.fieldId };
+  }
+  function deletePerson(personId, actor) {
+    const current = db.prepare("SELECT * FROM paper_people WHERE id=?").get(personId);
+    if (!current) throw appError("Person not found", 404);
+    transactional(() => {
+      db.prepare("UPDATE paper_slips SET person_name=COALESCE(person_name,?),person_id=NULL WHERE person_id=?")
+        .run(current.name, personId);
+      db.prepare("DELETE FROM paper_people WHERE id=?").run(personId);
+      audit(actor, "DELETE_PAPER_PERSON", personId, { name: current.name });
+    });
+    return { ok: true };
   }
   function listSlips() {
     return db
@@ -331,8 +391,12 @@ export function createPaperService(db, { audit, transactional, appError }) {
   return {
     listFields,
     addField,
+    updateField,
+    deleteField,
     listPeople,
     addPerson,
+    updatePerson,
+    deletePerson,
     listSlips,
     addSlip,
     addSlips,

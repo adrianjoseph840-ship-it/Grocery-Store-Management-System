@@ -17,9 +17,15 @@ body {
   margin: 0;
   min-height: 100vh;
 }
+
+.password-change-card {
+  max-width: 520px;
+  margin: 3rem auto;
+}
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 button {
@@ -37,7 +43,8 @@ button:hover {
 }
 button:focus-visible,
 input:focus-visible,
-select:focus-visible {
+select:focus-visible,
+textarea:focus-visible {
   outline: 3px solid #79d7aa;
   outline-offset: 2px;
 }
@@ -51,6 +58,16 @@ button.secondary {
 }
 button.secondary:hover {
   background: #d7e7d9;
+}
+button.danger {
+  color: #a13229;
+  background: #fae9e7;
+}
+.directory-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 .full-width {
   width: 100%;
@@ -248,7 +265,8 @@ label {
   margin-bottom: 13px;
 }
 input,
-select {
+select,
+textarea {
   display: block;
   width: 100%;
   padding: 11px 12px;
@@ -258,6 +276,39 @@ select {
   color: #18352c;
   margin-top: 6px;
   min-height: 44px;
+}
+textarea {
+  resize: vertical;
+}
+.profile-heading {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.profile-photo {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #dcece1;
+}
+.profile-placeholder {
+  display: grid;
+  place-items: center;
+  background: #177957;
+  color: white;
+  font-size: 2rem;
+  font-weight: 850;
+}
+.worker-debt-results {
+  margin-top: 14px;
+}
+.worker-debt-amount {
+  color: #b15b16;
+  font-size: 1.15rem;
+  font-weight: 850;
+  text-align: right;
 }
 input[type="checkbox"] {
   display: inline;

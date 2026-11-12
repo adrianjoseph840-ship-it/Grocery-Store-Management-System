@@ -18,28 +18,33 @@ const today = () =>
   new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
 
 export async function sheetPage(view, notice, run) {
-  const [fields, slips] = await Promise.all([
+  const [fields, people, slips] = await Promise.all([
     request("/paper/fields"),
+    request("/paper/people"),
     request("/paper/slips"),
   ]);
-  const defaultField =
-    fields.find((field) => field.name === "Guards")?.id || fields[0]?.id;
-
-  // Each row is one paper slip. A blank name is valid even for payroll fields.
-  const row = () => `<tr class="sheet-entry">
+  // Registered workers are displayed automatically; an extra blank row handles unknown names.
+  const row = (person = null) => `<tr class="sheet-entry" data-person-id="${person?.id || ""}">
     <td class="row-number"></td>
-    <td><select class="sheet-field" aria-label="Field">${fields.map((field) => `<option value="${field.id}" ${field.id === defaultField ? "selected" : ""}>${esc(field.name)}</option>`).join("")}</select></td>
-    <td><input class="sheet-name" aria-label="Name (optional)" placeholder="Optional name" maxlength="120" autocomplete="off"></td>
+    <td class="sheet-person-name">${person ? esc(person.name) : ""}</td>
     <td><input class="sheet-amount" aria-label="Slip amount in pesos" type="number" min="0.01" step="0.01" placeholder="0.00"></td>
     <td><input class="sheet-date" aria-label="Slip date" type="date" value="${today()}"></td>
     <td><button type="button" class="sheet-remove secondary" aria-label="Remove row">×</button></td>
   </tr>`;
 
-  view.innerHTML = `<div class="page-head"><div><div class="eyebrow">DAILY ENTRY</div><h1>Paper slip sheet</h1><p>Type across the rows like a spreadsheet. Names are optional; every slip is counted under its field.</p></div></div>
-    <div class="card"><form id="sheetForm"><div class="table-wrap"><table class="sheet-table"><thead><tr><th>#</th><th>Field</th><th>Name (optional)</th><th>Slip amount (₱)</th><th>Date</th><th></th></tr></thead><tbody id="sheetRows">${Array.from({ length: 5 }, row).join("")}</tbody></table></div>
-      <div class="sheet-actions"><button id="addSheetRow" type="button" class="secondary">+ Add row</button><div class="sheet-total"><span id="sheetCount">0 slips</span><strong id="sheetTotal">${pesos(0)}</strong></div><button id="saveSheet" type="submit">Save all slips</button></div></form><p class="muted">Cash field amounts count as collected immediately. The other fields count as paper slip sales until payment is recorded.</p></div>
-    <div class="card"><h2>Recently saved slips</h2><div class="table-wrap"><table><thead><tr><th>Date</th><th>Field</th><th>Name</th><th>Amount</th></tr></thead><tbody>${slips.map((slip) => `<tr><td>${esc(slip.slip_date)}</td><td>${esc(slip.field_name)}</td><td>${esc(slip.display_name || "—")}</td><td>${pesos(slip.amount_minor)}</td></tr>`).join("") || '<tr><td colspan="4" class="muted">No slips saved yet.</td></tr>'}</tbody></table></div></div>`;
+  view.innerHTML = `<div class="page-head"><div><div class="eyebrow">DAILY ENTRY</div><h1>Paper slip sheet</h1><p>Choose the department once, then enter every slip for that department below.</p></div></div>
+    <div class="card"><form id="sheetForm"><label>Department<select id="sheetFixedField" aria-label="Department">${fields.map((field) => `<option value="${field.id}">${esc(field.name)}</option>`).join("")}</select></label><p class="muted">Workers added under People & departments appear automatically. The final blank row can be used when the name is unknown.</p><div class="table-wrap"><table class="sheet-table"><thead><tr><th>#</th><th>Name</th><th>Slip amount (₱)</th><th>Exact date</th><th></th></tr></thead><tbody id="sheetRows"></tbody></table></div>
+      <div class="sheet-actions"><button id="addSheetRow" type="button" class="secondary">+ Add row</button><div class="sheet-total"><span id="sheetCount">0 slips</span><strong id="sheetTotal">${pesos(0)}</strong></div><button id="saveSheet" type="submit">Save all slips</button></div></form></div>
+    <div class="card"><h2>Recently saved slips</h2><div class="table-wrap"><table><thead><tr><th>Exact date</th><th>Department</th><th>Name</th><th>Amount</th></tr></thead><tbody>${slips.map((slip) => `<tr><td>${esc(slip.slip_date)}</td><td>${esc(slip.field_name)}</td><td>${esc(slip.display_name || "—")}</td><td>${pesos(slip.amount_minor)}</td></tr>`).join("") || '<tr><td colspan="4" class="muted">No slips saved yet.</td></tr>'}</tbody></table></div></div>`;
 
+  const fillWorkerRows = () => {
+    const selectedField = fields.find((field) => field.id === $("#sheetFixedField").value);
+    const matches = people.filter((person) => person.field_id === selectedField.id);
+    $("#sheetRows").innerHTML =
+      (selectedField.kind === "CASH" ? "" : matches.map((person) => row(person)).join("")) + row();
+    renumber();
+    updateTotal();
+  };
   const renumber = () =>
     view
       .querySelectorAll("#sheetRows .row-number")
@@ -59,7 +64,8 @@ export async function sheetPage(view, notice, run) {
       ),
     );
   };
-  renumber();
+  $("#sheetFixedField").onchange = fillWorkerRows;
+  fillWorkerRows();
   $("#sheetRows").oninput = updateTotal;
   $("#sheetRows").onclick = (event) => {
     if (!event.target.closest(".sheet-remove")) return;
@@ -78,18 +84,17 @@ export async function sheetPage(view, notice, run) {
     run(async () => {
       const slipsToSave = [...view.querySelectorAll("#sheetRows tr")]
         .map((entry, index) => {
-          const name = entry.querySelector(".sheet-name").value.trim();
+          const personId = entry.dataset.personId;
           const value = entry.querySelector(".sheet-amount").value.trim();
           if (!value) {
-            if (name) throw new Error(`Row ${index + 1}: enter a slip amount.`);
             return null;
           }
           const amountMinor = Math.round(Number(value) * 100);
           if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0)
             throw new Error(`Row ${index + 1}: enter a positive amount.`);
           return {
-            fieldId: entry.querySelector(".sheet-field").value,
-            name,
+            fieldId: $("#sheetFixedField").value,
+            personId: personId || null,
             amountMinor,
             slipDate: entry.querySelector(".sheet-date").value,
           };

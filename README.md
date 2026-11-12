@@ -5,6 +5,8 @@ sales, field totals, and weekly or custom date-range income reporting.
 
 ## Documentation
 
+- [Active database and manual accounts](docs/active-database.md)
+
 - [System architecture](docs/architecture.md)
 - [PostgreSQL schema](docs/schema.sql)
 - [Implementation roadmap](docs/implementation-roadmap.md)
@@ -66,10 +68,26 @@ to choose another data folder and `PORT` to change the listening port. Run tests
 
 ### Add or edit an account
 
-Log in with an admin account, open **Accounts**, and use **Create account**. Select a
-role, section, and optional credit limit. To edit an existing account, click **Edit**
+The programmer can create a separate account for each person directly in the main
+SQLite database using this command from the project folder:
+
+```powershell
+node scripts/create-account.js
+```
+
+Enter that person's email, full name, role, and a unique temporary password when
+prompted. Give only that person's credentials to them. At first sign-in, they must
+change the password before accessing the app. Repeat the command for each person.
+The database stores only a password hash, so record the temporary password securely
+when you create it; it cannot be read back from the database.
+
+Log in with an admin account, open **Accounts**, and use **Create account**. Enter the
+account email and a temporary password, then select a role, section, and optional credit
+limit. At first login, the account holder must replace the temporary password before any
+other screen or API action is available. To edit an existing account, click **Edit**
 beside it. You can change its role, section, credit settings, active status, or set a
-new password. A password reset logs that user out of existing sessions.
+new temporary password. A password reset logs that user out of existing sessions and
+requires another password change at the next login.
 
 ## Implemented workflows
 
@@ -80,8 +98,8 @@ new password. A password reset logs that user out of existing sessions.
 - Buyer: own balance and ledger history.
 
 Default fields are **Guards, Admin, Operation, Extra, Agency, Driver, and Cash**.
-**Paper slips** is a spreadsheet-style entry sheet: add rows with field, optional
-name, amount, and date. The total updates as you type, and **Save all slips** posts
+**Paper slips** is a spreadsheet-style entry sheet: choose one fixed field for the sheet,
+then add rows with an optional name, amount, and date. The total updates as you type, and **Save all slips** posts
 the whole batch together. Cash slips count as collected immediately. The dashboard
 shows sales and collected income without an outstanding-debt card. The **Weekly
 report** accepts any date range, including only part of a week.

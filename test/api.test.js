@@ -244,6 +244,23 @@ test("cashier sale and settlement reconcile in persistent API", async () => {
       creditLimitMinor: 20000,
       creditAllowed: true,
     });
+    await call("/login", "POST", {
+      username: "buyer",
+      password: "BuyerPassword123",
+    });
+    assert.equal((await call("/me")).must_change_password, 1);
+    const passwordGate = await call("/paper/fields", "GET", undefined, 403);
+    assert.match(passwordGate.error, /Change your temporary password/);
+    const changedBuyer = await call("/change-password", "POST", {
+      currentPassword: "BuyerPassword123",
+      newPassword: "BuyerChosenPassword456",
+      confirmPassword: "BuyerChosenPassword456",
+    });
+    assert.equal(changedBuyer.must_change_password, 0);
+    await call("/login", "POST", {
+      username: "admin",
+      password: "TestPassword123456",
+    });
     const updatedBuyer = await call(`/users/${buyer.id}`, "PATCH", {
       name: "Updated Buyer",
       username: "buyer",

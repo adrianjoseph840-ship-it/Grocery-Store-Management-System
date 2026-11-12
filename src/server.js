@@ -35,6 +35,14 @@ CREATE TABLE IF NOT EXISTS ledger(id TEXT PRIMARY KEY, buyer_id TEXT NOT NULL RE
 CREATE TABLE IF NOT EXISTS movements(id TEXT PRIMARY KEY, drawer_id TEXT NOT NULL REFERENCES drawers(id), amount INTEGER NOT NULL, type TEXT NOT NULL, sale_id TEXT REFERENCES sales(id), ledger_id TEXT REFERENCES ledger(id), created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS audit(id TEXT PRIMARY KEY, actor_id TEXT REFERENCES users(id), action TEXT NOT NULL, subject_id TEXT, details TEXT, created_at TEXT NOT NULL);
 `);
+// Existing installations predate first-login password changes, so migrate them
+// in place without forcing established accounts through the new flow.
+if (!db.prepare("PRAGMA table_info(users)").all().some((column) => column.name === "must_change_password"))
+  db.exec("ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0");
+if (!db.prepare("PRAGMA table_info(users)").all().some((column) => column.name === "profile_details"))
+  db.exec("ALTER TABLE users ADD COLUMN profile_details TEXT NOT NULL DEFAULT ''");
+if (!db.prepare("PRAGMA table_info(users)").all().some((column) => column.name === "profile_picture"))
+  db.exec("ALTER TABLE users ADD COLUMN profile_picture TEXT NOT NULL DEFAULT ''");
 const now = () => new Date().toISOString();
 const id = () => randomUUID();
 const hashPassword = (password) => {
@@ -61,7 +69,7 @@ const balance = (buyerId) =>
 const findUser = (userId) =>
   db
     .prepare(
-      "SELECT id,name,username,role,section_id,credit_limit,credit_allowed,restricted,active FROM users WHERE id=?",
+      "SELECT id,name,username,role,section_id,credit_limit,credit_allowed,restricted,active,must_change_password,profile_details,profile_picture FROM users WHERE id=?",
     )
     .get(userId);
 const appError = (message, code = 400) =>
@@ -183,6 +191,60 @@ async function api(req, res, path) {
     });
   }
   const user = authentication(req);
+  if (method === "PATCH" && path === "/api/profile") {
+    const input = await body(req);
+    const name = input.name?.trim();
+    const username = input.username?.trim();
+    const details = input.profileDetails?.trim() || "";
+    const picture = input.profilePicture || "";
+    if (!name || !username || details.length > 500)
+      throw appError("Name and username are required; profile details are limited to 500 characters");
+    if (
+      picture &&
+      (!/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(picture) ||
+        picture.length > 350000)
+    )
+      throw appError("Profile picture must be a PNG, JPEG, or WebP image under 250 KB");
+    const duplicate = db
+      .prepare("SELECT id FROM users WHERE username=? COLLATE NOCASE AND id<>?")
+      .get(username, user.id);
+    if (duplicate) throw appError("Username is already in use", 409);
+    db.prepare(
+      "UPDATE users SET name=?,username=?,profile_details=?,profile_picture=? WHERE id=?",
+    ).run(name, username, details, picture, user.id);
+    audit(user.id, "UPDATE_PROFILE", user.id, { name, username });
+    return json(res, 200, findUser(user.id));
+  }
+  if (method === "POST" && path === "/api/change-password") {
+    const input = await body(req);
+    const credentials = db
+      .prepare("SELECT password_hash FROM users WHERE id=?")
+      .get(user.id);
+    if (
+      typeof input.currentPassword !== "string" ||
+      !verifyPassword(input.currentPassword, credentials.password_hash)
+    )
+      throw appError("Current password is incorrect", 401);
+    if (typeof input.newPassword !== "string" || input.newPassword.length < 12)
+      throw appError("New password must be at least 12 characters");
+    if (input.newPassword !== input.confirmPassword)
+      throw appError("New passwords do not match");
+    if (input.newPassword === input.currentPassword)
+      throw appError("Choose a password different from the temporary password");
+    db.prepare(
+      "UPDATE users SET password_hash=?,must_change_password=0 WHERE id=?",
+    ).run(hashPassword(input.newPassword), user.id);
+    audit(user.id, "CHANGE_PASSWORD", user.id, { firstLogin: !!user.must_change_password });
+    return json(res, 200, findUser(user.id));
+  }
+  // A temporary-password session may only identify itself, change its password,
+  // or log out. This is enforced by the API rather than only by the browser.
+  if (
+    user.must_change_password &&
+    !(method === "GET" && path === "/api/me") &&
+    !(method === "POST" && path === "/api/logout")
+  )
+    throw appError("Change your temporary password before continuing", 403);
   // The paper workflow is intentionally separate from the older menu POS routes.
   if (path.startsWith("/api/paper/")) {
     if (method === "GET" && path === "/api/paper/fields") {
@@ -193,6 +255,14 @@ async function api(req, res, path) {
       roles(user, "ADMIN");
       return json(res, 201, paper.addField(await body(req), user.id));
     }
+    if (method === "PATCH" && /^\/api\/paper\/fields\/[^/]+$/.test(path)) {
+      roles(user, "ADMIN");
+      return json(res, 200, paper.updateField(path.split("/")[4], await body(req), user.id));
+    }
+    if (method === "DELETE" && /^\/api\/paper\/fields\/[^/]+$/.test(path)) {
+      roles(user, "ADMIN");
+      return json(res, 200, paper.deleteField(path.split("/")[4], user.id));
+    }
     if (method === "GET" && path === "/api/paper/people") {
       roles(user, "ADMIN", "CASHIER", "GUARD");
       return json(res, 200, paper.listPeople());
@@ -200,6 +270,14 @@ async function api(req, res, path) {
     if (method === "POST" && path === "/api/paper/people") {
       roles(user, "ADMIN", "CASHIER");
       return json(res, 201, paper.addPerson(await body(req), user.id));
+    }
+    if (method === "PATCH" && /^\/api\/paper\/people\/[^/]+$/.test(path)) {
+      roles(user, "ADMIN", "CASHIER");
+      return json(res, 200, paper.updatePerson(path.split("/")[4], await body(req), user.id));
+    }
+    if (method === "DELETE" && /^\/api\/paper\/people\/[^/]+$/.test(path)) {
+      roles(user, "ADMIN", "CASHIER");
+      return json(res, 200, paper.deletePerson(path.split("/")[4], user.id));
     }
     if (method === "GET" && path === "/api/paper/slips") {
       roles(user, "ADMIN", "CASHIER");
@@ -329,7 +407,7 @@ async function api(req, res, path) {
       200,
       db
         .prepare(
-          "SELECT id,name,username,role,section_id,credit_limit,credit_allowed,restricted,active FROM users ORDER BY name",
+          "SELECT id,name,username,role,section_id,credit_limit,credit_allowed,restricted,active,must_change_password FROM users ORDER BY name",
         )
         .all(),
     );
@@ -378,7 +456,7 @@ async function api(req, res, path) {
       throw appError("Username is already in use", 409);
     const userId = id();
     db.prepare(
-      "INSERT INTO users(id,name,username,password_hash,role,section_id,credit_limit,credit_allowed) VALUES(?,?,?,?,?,?,?,?)",
+      "INSERT INTO users(id,name,username,password_hash,role,section_id,credit_limit,credit_allowed,must_change_password) VALUES(?,?,?,?,?,?,?,?,1)",
     ).run(
       userId,
       input.name.trim(),
@@ -431,7 +509,7 @@ async function api(req, res, path) {
       );
       // A password reset revokes existing sessions so old credentials stop working.
       if (input.password) {
-        db.prepare("UPDATE users SET password_hash=? WHERE id=?").run(
+        db.prepare("UPDATE users SET password_hash=?,must_change_password=1 WHERE id=?").run(
           hashPassword(input.password),
           targetId,
         );

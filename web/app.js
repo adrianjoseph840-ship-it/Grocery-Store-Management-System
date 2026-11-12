@@ -57,6 +57,7 @@ async function showApp() {
   document.body.classList.remove("login-mode");
   $("#login").hidden = true;
   $("#app").hidden = false;
+  if (me.must_change_password) return showRequiredPasswordChange();
   $("#identity").innerHTML =
     `${esc(me.name)} · ${esc(me.role)} <button class="secondary" id="logout">Log out</button>`;
   $("#logout").onclick = async () => {
@@ -68,23 +69,25 @@ async function showApp() {
       ? [
           "Dashboard",
           "Paper slips",
-          "People & fields",
-          "Collections",
+          "People & departments",
+          "Debt monitor",
           "Weekly report",
           "Accounts",
           "Audit",
+          "My profile",
         ]
       : me.role === "CASHIER"
         ? [
             "Dashboard",
             "Paper slips",
-            "People & fields",
-            "Collections",
+            "People & departments",
+            "Debt monitor",
             "Weekly report",
+            "My profile",
           ]
         : me.role === "GUARD"
-          ? ["Verify"]
-          : ["My account"];
+          ? ["Verify", "My profile"]
+          : ["My account", "My profile"];
   $("#nav").innerHTML = tabs
     .map(
       (tab, i) =>
@@ -100,6 +103,36 @@ async function showApp() {
   };
   render(tabs[0]);
 }
+function showRequiredPasswordChange() {
+  $("#identity").innerHTML = `${esc(me.name)} <button class="secondary" id="logout">Log out</button>`;
+  $("#nav").innerHTML = "";
+  $("#notice").textContent = "";
+  $("#view").innerHTML = `<div class="card password-change-card"><div class="eyebrow">ACCOUNT SECURITY</div><h1>Create your own password</h1><p>Your administrator gave you a temporary password. Change it before using the canteen system.</p><form id="requiredPasswordForm"><label>Temporary password<input name="currentPassword" type="password" autocomplete="current-password" required></label><label>New password (12+ characters)<input name="newPassword" type="password" minlength="12" autocomplete="new-password" required></label><label>Confirm new password<input name="confirmPassword" type="password" minlength="12" autocomplete="new-password" required></label><button class="full-width">Change password and continue</button></form><p id="passwordChangeError" class="error" role="alert" hidden></p></div>`;
+  $("#logout").onclick = async () => {
+    await request("/logout", { method: "POST" });
+    location.reload();
+  };
+  $("#requiredPasswordForm").onsubmit = async (event) => {
+    event.preventDefault();
+    const button = event.target.querySelector("button");
+    const error = $("#passwordChangeError");
+    button.disabled = true;
+    error.hidden = true;
+    try {
+      me = await request("/change-password", {
+        method: "POST",
+        body: JSON.stringify(form(event)),
+      });
+      await showApp();
+      notice("Password changed successfully.");
+    } catch (cause) {
+      error.textContent = cause.message;
+      error.hidden = false;
+    } finally {
+      button.disabled = false;
+    }
+  };
+}
 async function render(tab) {
   notice("");
   try {
@@ -107,7 +140,8 @@ async function render(tab) {
       [
         "Dashboard",
         "Paper slips",
-        "People & fields",
+        "People & departments",
+        "Debt monitor",
         "Collections",
         "Weekly report",
       ].includes(tab)
@@ -124,9 +158,59 @@ async function render(tab) {
     if (tab === "Audit") return await audit();
     if (tab === "Verify") return await verify();
     if (tab === "My account") return await account(me.id);
+    if (tab === "My profile") return profile();
   } catch (error) {
     notice(error.message, true);
   }
+}
+function profile() {
+  const photo = me.profile_picture
+    ? `<img class="profile-photo" src="${me.profile_picture}" alt="${esc(me.name)} profile picture">`
+    : `<div class="profile-photo profile-placeholder" aria-hidden="true">${esc(me.name?.[0]?.toUpperCase() || "?")}</div>`;
+  $("#view").innerHTML =
+    `<div class="page-head"><div><div class="eyebrow">MY PROFILE</div><h1>Profile and security</h1><p>Update your personal information and password.</p></div></div><div class="two"><div class="card"><div class="profile-heading">${photo}<div><h2>${esc(me.name)}</h2><span class="pill">${esc(me.role)}</span></div></div><form id="profileForm"><label>Profile picture<input name="picture" type="file" accept="image/png,image/jpeg,image/webp"></label><p class="muted">PNG, JPEG, or WebP; maximum 250 KB. Leave empty to keep the current picture.</p>${me.profile_picture ? '<label><input name="removePicture" type="checkbox"> Remove current picture</label>' : ""}<label>Full name<input name="name" value="${esc(me.name)}" required></label><label>Username<input name="username" value="${esc(me.username)}" required></label><label>Profile details<textarea name="profileDetails" maxlength="500" rows="5" placeholder="Position, contact details, or other useful information">${esc(me.profile_details || "")}</textarea></label><button>Save profile</button></form></div><div class="card"><h2>Change password</h2><p>Passwords cannot be viewed. If you forget yours, an administrator can set a new temporary password.</p><form id="profilePasswordForm"><label>Current password<input name="currentPassword" type="password" autocomplete="current-password" required></label><label>New password (12+ characters)<input name="newPassword" type="password" minlength="12" autocomplete="new-password" required></label><label>Confirm new password<input name="confirmPassword" type="password" minlength="12" autocomplete="new-password" required></label><button>Change password</button></form></div></div>`;
+  $("#profileForm").onsubmit = (event) => {
+    event.preventDefault();
+    act(async () => {
+      const fields = form(event);
+      const file = event.target.elements.picture.files[0];
+      if (file?.size > 250000) throw Error("Profile picture must be under 250 KB.");
+      const profilePicture = fields.removePicture
+        ? ""
+        : file
+          ? await readImage(file)
+          : me.profile_picture || "";
+      me = await request("/profile", {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: fields.name,
+          username: fields.username,
+          profileDetails: fields.profileDetails,
+          profilePicture,
+        }),
+      });
+      await showApp();
+      document.querySelector('[data-tab="My profile"]')?.click();
+    });
+  };
+  $("#profilePasswordForm").onsubmit = (event) => {
+    event.preventDefault();
+    act(async () => {
+      me = await request("/change-password", {
+        method: "POST",
+        body: JSON.stringify(form(event)),
+      });
+      event.target.reset();
+    });
+  };
+}
+function readImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(Error("Could not read the selected image."));
+    reader.readAsDataURL(file);
+  });
 }
 async function overview() {
   const r = await request("/reports/summary");
@@ -135,7 +219,7 @@ async function overview() {
     ["Cash sales", r.cash],
     ["New debt", r.debt],
     ["Cash debt payments", r.cashDebtPayments],
-    ["Outstanding debt", r.outstanding],
+    ["Total", r.outstanding],
   ]
     .map(
       ([label, value]) =>
@@ -207,7 +291,7 @@ async function pos() {
       if (selectedBuyer !== b.id) return;
       $("#buyerInfo").className = `buyer-info ${b.restricted ? "warning" : ""}`;
       $("#buyerInfo").innerHTML =
-        `<strong>${esc(b.name)}</strong> · ${esc(b.username)}<br>Outstanding ${pesos(b.balanceMinor)} · Available credit ${pesos(b.availableCreditMinor)}${b.restricted ? " · Debt restricted" : ""}`;
+        `<strong>${esc(b.name)}</strong> · ${esc(b.username)}<br>Total ${pesos(b.balanceMinor)} · Available credit ${pesos(b.availableCreditMinor)}${b.restricted ? " · Debt restricted" : ""}`;
       drawCart(false);
     } catch (error) {
       notice(error.message, true);
@@ -398,7 +482,7 @@ async function team() {
     request("/users"),
   ]);
   $("#view").innerHTML =
-    `<h1>Team and sections</h1><div class="two"><div class="card"><h2>Add section</h2><form id="newSection"><label>Name<input name="name" required></label><button>Add section</button></form>${sections.map((s) => `<div class="row">${esc(s.name)}</div>`).join("")}</div><div class="card"><h2>Add team member</h2><form id="newUser"><label>Name<input name="name" required></label><label>Username<input name="username" required></label><label>Password (12+ characters)<input name="password" type="password" minlength="12" required></label><label>Role<select name="role"><option>BUYER</option><option>CASHIER</option><option>GUARD</option><option>ADMIN</option></select></label><label>Section<select name="section"><option value="">None</option>${sections.map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join("")}</select></label><label>Credit limit (₱)<input name="limit" type="number" min="0" step=".01" value="0"></label><label><input name="credit" type="checkbox" style="display:inline;width:auto"> Allow credit</label><button>Create user</button></form></div></div><div class="card"><h2>Users</h2>${people.map((u) => `<div class="row"><span>${esc(u.name)}</span><span class="pill">${esc(u.role)}</span></div>`).join("")}</div>`;
+    `<h1>Team and sections</h1><div class="two"><div class="card"><h2>Add section</h2><form id="newSection"><label>Name<input name="name" required></label><button>Add section</button></form>${sections.map((s) => `<div class="row">${esc(s.name)}</div>`).join("")}</div><div class="card"><h2>Add team member</h2><form id="newUser"><label>Full name<input name="name" required></label><label>Account email<input name="username" inputmode="email" required></label><label>Temporary password (12+ characters)<input name="password" type="password" minlength="12" autocomplete="new-password" required></label><p class="muted">The account holder must replace this password after their first login.</p><label>Role<select name="role"><option>BUYER</option><option>CASHIER</option><option>GUARD</option><option>ADMIN</option></select></label><label>Section<select name="section"><option value="">None</option>${sections.map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join("")}</select></label><label>Credit limit (₱)<input name="limit" type="number" min="0" step=".01" value="0"></label><label><input name="credit" type="checkbox" style="display:inline;width:auto"> Allow credit</label><button>Create user</button></form></div></div><div class="card"><h2>Users</h2>${people.map((u) => `<div class="row"><span>${esc(u.name)} <small class="muted">${esc(u.username)}</small></span><span class="pill">${u.must_change_password ? "Password change required" : esc(u.role)}</span></div>`).join("")}</div>`;
   $("#view h1").textContent = "Accounts and sections";
   $("#newUser").previousElementSibling.textContent = "Create account";
   $("#newUser button").textContent = "Create account";
@@ -448,7 +532,7 @@ function editAccount(person, sections) {
   $("#accountEditor")?.remove();
   $("#view").insertAdjacentHTML(
     "beforeend",
-    `<div class="card" id="accountEditor"><h2>Edit ${esc(person.name)}</h2><form id="editAccount"><label>Full name<input name="name" value="${esc(person.name)}" required></label><label>Username<input name="username" value="${esc(person.username)}" required></label><label>Role<select name="role">${["BUYER", "CASHIER", "GUARD", "ADMIN"].map((role) => `<option ${person.role === role ? "selected" : ""}>${role}</option>`).join("")}</select></label><label>Section<select name="section"><option value="">None</option>${sections.map((s) => `<option value="${s.id}" ${person.section_id === s.id ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select></label><label>Credit limit (₱)<input name="limit" type="number" min="0" step=".01" value="${(person.credit_limit / 100).toFixed(2)}" required></label><label><input name="credit" type="checkbox" ${person.credit_allowed ? "checked" : ""}> Allow credit</label><label><input name="restricted" type="checkbox" ${person.restricted ? "checked" : ""}> Restrict debt purchases</label><label><input name="active" type="checkbox" ${person.active ? "checked" : ""}> Active account</label><label>New password (optional, 12+ characters)<input name="password" type="password" minlength="12" autocomplete="new-password"></label><button>Save account</button></form></div>`,
+    `<div class="card" id="accountEditor"><h2>Edit ${esc(person.name)}</h2><form id="editAccount"><label>Full name<input name="name" value="${esc(person.name)}" required></label><label>Account email<input name="username" inputmode="email" value="${esc(person.username)}" required></label><label>Role<select name="role">${["BUYER", "CASHIER", "GUARD", "ADMIN"].map((role) => `<option ${person.role === role ? "selected" : ""}>${role}</option>`).join("")}</select></label><label>Section<select name="section"><option value="">None</option>${sections.map((s) => `<option value="${s.id}" ${person.section_id === s.id ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select></label><label>Credit limit (₱)<input name="limit" type="number" min="0" step=".01" value="${(person.credit_limit / 100).toFixed(2)}" required></label><label><input name="credit" type="checkbox" ${person.credit_allowed ? "checked" : ""}> Allow credit</label><label><input name="restricted" type="checkbox" ${person.restricted ? "checked" : ""}> Restrict debt purchases</label><label><input name="active" type="checkbox" ${person.active ? "checked" : ""}> Active account</label><label>New temporary password (optional, 12+ characters)<input name="password" type="password" minlength="12" autocomplete="new-password"></label><p class="muted">After a reset, the account holder must choose a new password at login.</p><button>Save account</button></form></div>`,
   );
   $("#accountEditor").scrollIntoView({ behavior: "smooth", block: "start" });
   $("#editAccount").onsubmit = (event) => {
