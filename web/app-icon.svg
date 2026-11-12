@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Canteen Ledger">
+  <rect width="512" height="512" rx="112" fill="#123d32"/>
+  <circle cx="256" cy="256" r="166" fill="#e7c36e"/>
+  <path d="M326 173c-22-21-48-32-79-32-68 0-119 49-119 116s51 114 119 114c34 0 64-12 86-36l-45-42c-11 12-24 18-40 18-29 0-49-22-49-55 0-34 20-56 49-56 16 0 29 6 40 18l38-45z" fill="#123d32"/>
+  <path d="M348 324h45v45h-45z" fill="#177957"/>
+</svg>

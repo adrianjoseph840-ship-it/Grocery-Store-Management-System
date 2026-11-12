@@ -982,6 +982,11 @@ const server = http.createServer(async (req, res) => {
         "style.css",
         "theme.css",
         "paper.css",
+        "manifest.webmanifest",
+        "service-worker.js",
+        "app-icon.svg",
+        "app-icon-192.png",
+        "app-icon-512.png",
       ].includes(file)
     )
       throw appError("Not found", 404);
@@ -989,6 +994,9 @@ const server = http.createServer(async (req, res) => {
       ".html": "text/html; charset=utf-8",
       ".js": "text/javascript; charset=utf-8",
       ".css": "text/css; charset=utf-8",
+      ".webmanifest": "application/manifest+json; charset=utf-8",
+      ".svg": "image/svg+xml; charset=utf-8",
+      ".png": "image/png",
     };
     res.writeHead(200, {
       "content-type": mime[extname(file)],

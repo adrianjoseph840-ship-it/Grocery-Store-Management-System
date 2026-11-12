@@ -1,6 +1,11 @@
 import { request } from "./api.js";
 import { renderPaperPage } from "./paper-ui.js";
 
+if ("serviceWorker" in navigator)
+  window.addEventListener("load", () =>
+    navigator.serviceWorker.register("/service-worker.js").catch(() => {}),
+  );
+
 // UI rendering stays role-specific; every permission is also checked by the API.
 const $ = (selector) => document.querySelector(selector);
 const esc = (value) =>

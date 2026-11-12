@@ -87,6 +87,16 @@ test("cashier sale and settlement reconcile in persistent API", async () => {
     const styles = await fetch(`http://127.0.0.1:${port}/style.css`);
     assert.equal(styles.status, 200);
     assert.match(await styles.text(), /pos-grid/);
+    const manifest = await fetch(`http://127.0.0.1:${port}/manifest.webmanifest`);
+    assert.equal(manifest.status, 200);
+    assert.match(manifest.headers.get("content-type"), /application\/manifest\+json/);
+    assert.equal((await manifest.json()).display, "standalone");
+    const serviceWorker = await fetch(`http://127.0.0.1:${port}/service-worker.js`);
+    assert.equal(serviceWorker.status, 200);
+    assert.match(await serviceWorker.text(), /url\.pathname\.startsWith\("\/api\/"\)/);
+    const appIcon = await fetch(`http://127.0.0.1:${port}/app-icon-192.png`);
+    assert.equal(appIcon.status, 200);
+    assert.equal(appIcon.headers.get("content-type"), "image/png");
     const apiModule = await fetch(`http://127.0.0.1:${port}/api.js`);
     assert.equal(apiModule.status, 200);
     assert.match(await apiModule.text(), /export async function request/);
