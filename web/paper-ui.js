@@ -49,14 +49,26 @@ export async function renderPaperPage(tab, view, notice, role) {
 }
 
 async function dashboard(view) {
-  const [all, week] = await Promise.all([
+  const defaultFrom = today();
+  const defaultTo = addDays(defaultFrom, 5);
+  const [all, selected] = await Promise.all([
     request("/paper/report"),
-    request(`/paper/report?from=${weekStart(today())}&to=${today()}`),
+    request(`/paper/report?from=${defaultFrom}&to=${defaultTo}`),
   ]);
   const max = Math.max(...all.fields.map((f) => f.salesMinor), 1);
   view.innerHTML = `<div class="page-head"><div><div class="eyebrow">PAPER SLIP LEDGER</div><h1>Canteen dashboard</h1><p>Slip sales across all departments.</p></div><span class="pill">Updated now</span></div>
-    <div class="grid paper-kpis">${metric("Total sales", all.salesMinor, "All recorded slips")}${metric("This week", week.salesMinor, `${week.from} to ${week.to}`)}</div>
+    <div class="card"><h2>Choose dates</h2><form id="dashboardPeriod" class="inline"><label>From<input name="from" type="date" value="${defaultFrom}" required></label><label>To<input name="to" type="date" value="${defaultTo}" required></label><button>Show total</button></form></div>
+    <div class="grid paper-kpis">${metric("Total sales", all.salesMinor, "All recorded slips")}<div class="card paper-metric"><div class="eyebrow">Selected dates</div><div class="metric" id="dashboardPeriodTotal">${pesos(selected.salesMinor)}</div><div class="muted" id="dashboardPeriodDates">${selected.from} to ${selected.to}</div></div></div>
     <div class="card"><h2>Sales by department</h2>${all.fields.map((f) => `<div class="field-line"><div class="field-label"><strong>${esc(f.name)}</strong><span>${pesos(f.salesMinor)}</span></div><div class="field-track"><div style="width:${Math.round((f.salesMinor / max) * 100)}%"></div></div></div>`).join("")}</div>`;
+  $("#dashboardPeriod").onsubmit = async (event) => {
+    event.preventDefault();
+    const { from, to } = Object.fromEntries(new FormData(event.target));
+    const report = await request(
+      `/paper/report?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+    );
+    $("#dashboardPeriodTotal").textContent = pesos(report.salesMinor);
+    $("#dashboardPeriodDates").textContent = `${report.from} to ${report.to}`;
+  };
 }
 
 async function slipsPage(view, notice, run) {
