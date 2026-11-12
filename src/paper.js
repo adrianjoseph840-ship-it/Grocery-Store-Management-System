@@ -35,6 +35,20 @@ export function createPaperService(db, { audit, transactional, appError }) {
       .some((column) => column.name === "person_name")
   )
     db.exec("ALTER TABLE paper_slips ADD COLUMN person_name TEXT");
+  if (
+    !db
+      .prepare("PRAGMA table_info(paper_people)")
+      .all()
+      .some((column) => column.name === "owner_id")
+  ) {
+    db.exec("ALTER TABLE paper_people ADD COLUMN owner_id TEXT REFERENCES users(id)");
+    const existingOwner = db
+      .prepare("SELECT id FROM users WHERE username='admin' COLLATE NOCASE LIMIT 1")
+      .get()?.id || db.prepare("SELECT id FROM users ORDER BY rowid LIMIT 1").get()?.id;
+    if (existingOwner)
+      db.prepare("UPDATE paper_people SET owner_id=? WHERE owner_id IS NULL").run(existingOwner);
+  }
+  db.exec("CREATE INDEX IF NOT EXISTS paper_people_owner_idx ON paper_people(owner_id,field_id,name)");
 
   // Default fields match the paper piles used at the counter. Custom fields are credit.
   for (const [name, kind] of [
@@ -135,18 +149,19 @@ export function createPaperService(db, { audit, transactional, appError }) {
     audit(actor, "DELETE_PAPER_FIELD", fieldId, { name: current.name });
     return { ok: true };
   }
-  function listPeople() {
+  function listPeople(owner) {
     return db
       .prepare(
         `SELECT p.*,f.name field_name,
         COALESCE((SELECT SUM(s.amount_minor) FROM paper_slips s
-          WHERE s.person_id=p.id OR (s.person_id IS NULL AND s.person_name=p.name COLLATE NOCASE AND s.field_id=p.field_id)),0) -
+          WHERE s.recorded_by=p.owner_id AND (s.person_id=p.id OR (s.person_id IS NULL AND s.person_name=p.name COLLATE NOCASE AND s.field_id=p.field_id))),0) -
         COALESCE((SELECT SUM(c.amount_minor) FROM paper_collections c JOIN paper_slips s ON s.id=c.slip_id
-          WHERE s.person_id=p.id OR (s.person_id IS NULL AND s.person_name=p.name COLLATE NOCASE AND s.field_id=p.field_id)),0) outstanding_minor
+          WHERE s.recorded_by=p.owner_id AND (s.person_id=p.id OR (s.person_id IS NULL AND s.person_name=p.name COLLATE NOCASE AND s.field_id=p.field_id))),0) outstanding_minor
         FROM paper_people p JOIN paper_fields f ON f.id=p.field_id
+        WHERE p.owner_id=?
         ORDER BY f.name,p.name`,
       )
-      .all();
+      .all(owner);
   }
   function addPerson(input, actor) {
     const name = input.name?.trim();
@@ -158,23 +173,24 @@ export function createPaperService(db, { audit, transactional, appError }) {
     if (
       employeeCode &&
       db
-        .prepare("SELECT id FROM paper_people WHERE employee_code=?")
-        .get(employeeCode)
+        .prepare("SELECT id FROM paper_people WHERE employee_code=? AND owner_id=?")
+        .get(employeeCode, actor)
     )
       throw appError("Employee code already exists", 409);
     const id = randomUUID();
-    db.prepare("INSERT INTO paper_people VALUES(?,?,?,?,?)").run(
+    db.prepare("INSERT INTO paper_people(id,name,employee_code,field_id,created_at,owner_id) VALUES(?,?,?,?,?,?)").run(
       id,
       name,
       employeeCode,
       input.fieldId,
       new Date().toISOString(),
+      actor,
     );
     audit(actor, "ADD_PAPER_PERSON", id, { name, fieldId: input.fieldId });
     return { id, name, employeeCode, fieldId: input.fieldId };
   }
   function updatePerson(personId, input, actor) {
-    const current = db.prepare("SELECT * FROM paper_people WHERE id=?").get(personId);
+    const current = db.prepare("SELECT * FROM paper_people WHERE id=? AND owner_id=?").get(personId, actor);
     if (!current) throw appError("Person not found", 404);
     const name = input.name?.trim();
     const employeeCode = input.employeeCode?.trim() || null;
@@ -183,8 +199,8 @@ export function createPaperService(db, { audit, transactional, appError }) {
     if (field(input.fieldId).kind !== "CREDIT")
       throw appError("Choose a payroll field");
     const duplicate = employeeCode && db
-      .prepare("SELECT id FROM paper_people WHERE employee_code=? AND id<>?")
-      .get(employeeCode, personId);
+      .prepare("SELECT id FROM paper_people WHERE employee_code=? AND id<>? AND owner_id=?")
+      .get(employeeCode, personId, actor);
     if (duplicate) throw appError("Employee code already exists", 409);
     db.prepare("UPDATE paper_people SET name=?,employee_code=?,field_id=? WHERE id=?")
       .run(name, employeeCode, input.fieldId, personId);
@@ -192,7 +208,7 @@ export function createPaperService(db, { audit, transactional, appError }) {
     return { id: personId, name, employeeCode, fieldId: input.fieldId };
   }
   function deletePerson(personId, actor) {
-    const current = db.prepare("SELECT * FROM paper_people WHERE id=?").get(personId);
+    const current = db.prepare("SELECT * FROM paper_people WHERE id=? AND owner_id=?").get(personId, actor);
     if (!current) throw appError("Person not found", 404);
     transactional(() => {
       db.prepare("UPDATE paper_slips SET person_name=COALESCE(person_name,?),person_id=NULL WHERE person_id=?")
@@ -202,16 +218,17 @@ export function createPaperService(db, { audit, transactional, appError }) {
     });
     return { ok: true };
   }
-  function listSlips() {
+  function listSlips(owner) {
     return db
       .prepare(
         `SELECT s.*,f.name field_name,f.kind field_kind,COALESCE(s.person_name,p.name) display_name,
       COALESCE((SELECT SUM(c.amount_minor) FROM paper_collections c WHERE c.slip_id=s.id),0) collected_minor
       FROM paper_slips s JOIN paper_fields f ON f.id=s.field_id
       LEFT JOIN paper_people p ON p.id=s.person_id
+      WHERE s.recorded_by=?
       ORDER BY s.slip_date DESC,s.created_at DESC LIMIT 500`,
       )
-      .all();
+      .all(owner);
   }
   function addSlip(input, actor, requestKey) {
     return transactional(() => insertSlip(input, actor, requestKey));
@@ -247,8 +264,8 @@ export function createPaperService(db, { audit, transactional, appError }) {
       throw appError("Name must be 120 characters or less");
     if (input.personId) {
       const person = db
-        .prepare("SELECT * FROM paper_people WHERE id=?")
-        .get(input.personId);
+        .prepare("SELECT * FROM paper_people WHERE id=? AND owner_id=?")
+        .get(input.personId, actor);
       if (!person || person.field_id !== selected.id)
         throw appError("Choose a person in this field");
       personId = person.id;
@@ -295,6 +312,8 @@ export function createPaperService(db, { audit, transactional, appError }) {
         .get(requestKey);
       if (existing) return { id: existing.id, duplicate: true };
       const original = slip(input.slipId);
+      if (original.recorded_by !== actor)
+        throw appError("Paper slip not found", 404);
       if (field(original.field_id).kind === "CASH")
         throw appError("Cash slip is already collected");
       if (input.collectionDate < original.slip_date)
@@ -329,7 +348,7 @@ export function createPaperService(db, { audit, transactional, appError }) {
       };
     });
   }
-  function report(from, to) {
+  function report(from, to, owner) {
     // Sales and collections are period flows; outstanding is the balance as of
     // the selected end date, including slips from earlier weeks.
     if (from) date(from);
@@ -346,13 +365,13 @@ export function createPaperService(db, { audit, transactional, appError }) {
     }));
     const byId = new Map(fields.map((f) => [f.id, f]));
     const slips = db
-      .prepare("SELECT id,field_id,amount_minor,slip_date FROM paper_slips")
-      .all();
+      .prepare("SELECT id,field_id,amount_minor,slip_date FROM paper_slips WHERE recorded_by=?")
+      .all(owner);
     const collections = db
       .prepare(
-        "SELECT c.slip_id,c.amount_minor,c.method,c.collection_date,s.field_id FROM paper_collections c JOIN paper_slips s ON s.id=c.slip_id",
+        "SELECT c.slip_id,c.amount_minor,c.method,c.collection_date,s.field_id FROM paper_collections c JOIN paper_slips s ON s.id=c.slip_id WHERE s.recorded_by=?",
       )
-      .all();
+      .all(owner);
     const inRange = (day) => (!from || day >= from) && (!to || day <= to);
     for (const s of slips) {
       const f = byId.get(s.field_id);

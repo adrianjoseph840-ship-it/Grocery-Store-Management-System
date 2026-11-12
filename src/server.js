@@ -265,7 +265,7 @@ async function api(req, res, path) {
     }
     if (method === "GET" && path === "/api/paper/people") {
       roles(user, "ADMIN", "CASHIER", "GUARD");
-      return json(res, 200, paper.listPeople());
+      return json(res, 200, paper.listPeople(user.id));
     }
     if (method === "POST" && path === "/api/paper/people") {
       roles(user, "ADMIN", "CASHIER");
@@ -281,7 +281,7 @@ async function api(req, res, path) {
     }
     if (method === "GET" && path === "/api/paper/slips") {
       roles(user, "ADMIN", "CASHIER");
-      return json(res, 200, paper.listSlips());
+      return json(res, 200, paper.listSlips(user.id));
     }
     if (method === "POST" && path === "/api/paper/slips") {
       roles(user, "ADMIN", "CASHIER");
@@ -315,7 +315,7 @@ async function api(req, res, path) {
     if (method === "GET" && path === "/api/paper/report") {
       roles(user, "ADMIN", "CASHIER");
       const query = new URL(req.url, "http://localhost").searchParams;
-      return json(res, 200, paper.report(query.get("from"), query.get("to")));
+      return json(res, 200, paper.report(query.get("from"), query.get("to"), user.id));
     }
     throw appError("Paper route not found", 404);
   }
