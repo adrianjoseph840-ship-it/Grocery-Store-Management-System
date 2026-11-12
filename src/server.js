@@ -19,6 +19,7 @@ import { createPaperService } from "./paper.js";
 // Local deployment: SQLite keeps cash, debt, and audit records in one database.
 // Amounts are integer centavos throughout the application.
 const dataDir = process.env.CANTEEN_DATA_DIR || join(process.cwd(), "data");
+const secureCookie = process.env.COOKIE_SECURE === "1";
 mkdirSync(dataDir, { recursive: true });
 const db = new DatabaseSync(join(dataDir, "canteen.sqlite"));
 db.exec("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;");
@@ -187,7 +188,7 @@ async function api(req, res, path) {
     );
     audit(row.id, "LOGIN", row.id);
     return json(res, 200, findUser(row.id), {
-      "set-cookie": `canteen_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800`,
+      "set-cookie": `canteen_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800${secureCookie ? "; Secure" : ""}`,
     });
   }
   const user = authentication(req);
@@ -331,7 +332,7 @@ async function api(req, res, path) {
       { ok: true },
       {
         "set-cookie":
-          "canteen_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0",
+          `canteen_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${secureCookie ? "; Secure" : ""}`,
       },
     );
   }
@@ -1013,8 +1014,9 @@ const server = http.createServer(async (req, res) => {
     if (status === 500) console.error(error);
   }
 });
-server.listen(Number(process.env.PORT || 3000), "127.0.0.1", () =>
+const host = process.env.HOST || "127.0.0.1";
+server.listen(Number(process.env.PORT || 3000), host, () =>
   console.log(
-    `Canteen running at http://127.0.0.1:${process.env.PORT || 3000}`,
+    `Canteen running at http://${host}:${process.env.PORT || 3000}`,
   ),
 );

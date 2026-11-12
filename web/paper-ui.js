@@ -55,11 +55,21 @@ async function dashboard(view) {
     request("/paper/report"),
     request(`/paper/report?from=${defaultFrom}&to=${defaultTo}`),
   ]);
-  const max = Math.max(...all.fields.map((f) => f.salesMinor), 1);
   view.innerHTML = `<div class="page-head"><div><div class="eyebrow">PAPER SLIP LEDGER</div><h1>Canteen dashboard</h1><p>Slip sales across all departments.</p></div><span class="pill">Updated now</span></div>
     <div class="card"><h2>Choose dates</h2><form id="dashboardPeriod" class="inline"><label>From<input name="from" type="date" value="${defaultFrom}" required></label><label>To<input name="to" type="date" value="${defaultTo}" required></label><button>Show total</button></form></div>
     <div class="grid paper-kpis">${metric("Total sales", all.salesMinor, "All recorded slips")}<div class="card paper-metric"><div class="eyebrow">Selected dates</div><div class="metric" id="dashboardPeriodTotal">${pesos(selected.salesMinor)}</div><div class="muted" id="dashboardPeriodDates">${selected.from} to ${selected.to}</div></div></div>
-    <div class="card"><h2>Sales by department</h2>${all.fields.map((f) => `<div class="field-line"><div class="field-label"><strong>${esc(f.name)}</strong><span>${pesos(f.salesMinor)}</span></div><div class="field-track"><div style="width:${Math.round((f.salesMinor / max) * 100)}%"></div></div></div>`).join("")}</div>`;
+    <div class="card"><h2>Sales by department</h2><p class="muted" id="departmentPeriodDates"></p><div id="departmentPeriodRows"></div></div>`;
+  const drawDepartments = (report) => {
+    const max = Math.max(...report.fields.map((field) => field.salesMinor), 1);
+    $("#departmentPeriodDates").textContent = `${report.from} to ${report.to}`;
+    $("#departmentPeriodRows").innerHTML = report.fields
+      .map(
+        (field) =>
+          `<div class="field-line"><div class="field-label"><strong>${esc(field.name)}</strong><span>${pesos(field.salesMinor)}</span></div><div class="field-track"><div style="width:${Math.round((field.salesMinor / max) * 100)}%"></div></div></div>`,
+      )
+      .join("");
+  };
+  drawDepartments(selected);
   $("#dashboardPeriod").onsubmit = async (event) => {
     event.preventDefault();
     const { from, to } = Object.fromEntries(new FormData(event.target));
@@ -68,6 +78,7 @@ async function dashboard(view) {
     );
     $("#dashboardPeriodTotal").textContent = pesos(report.salesMinor);
     $("#dashboardPeriodDates").textContent = `${report.from} to ${report.to}`;
+    drawDepartments(report);
   };
 }
 

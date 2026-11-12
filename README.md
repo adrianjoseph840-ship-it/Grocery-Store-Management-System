@@ -6,6 +6,7 @@ sales, field totals, and weekly or custom date-range income reporting.
 ## Documentation
 
 - [Active database and manual accounts](docs/active-database.md)
+- [Deploy the installable PWA](docs/deployment.md)
 
 - [System architecture](docs/architecture.md)
 - [PostgreSQL schema](docs/schema.sql)
